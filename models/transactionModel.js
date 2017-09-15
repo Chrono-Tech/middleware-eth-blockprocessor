@@ -40,7 +40,7 @@ const Transaction = new mongoose.Schema({
 });
 
 
-Transaction.pre('validate', function(next) {
+Transaction.pre('validate', function (next) {
   this.payload = `${this.blockNumber}:${this.hash}`;
   next();
 });

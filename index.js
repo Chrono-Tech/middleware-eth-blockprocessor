@@ -70,7 +70,7 @@ const init = async () => {
       processBlock();
     } catch (err) {
       if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString())
-        return process.exit(-1);
+      {return process.exit(-1);}
 
       if (_.get(err, 'code') === 0) {
         log.info(`await for next block ${currentBlock}`);
