@@ -21,6 +21,8 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "eslint": "^4.6.1"
+    "babel-eslint": "^8.0.0",
+    "eslint": "^4.6.1",
+    "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank"
   }
 }
