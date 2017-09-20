@@ -19,7 +19,7 @@ const config = require('../config'),
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-describe('tests', function () {
+describe('core/block processor', function () {
 
   before(async () => {
     let provider = new Web3.providers.IpcProvider(config.web3.uri, net);
