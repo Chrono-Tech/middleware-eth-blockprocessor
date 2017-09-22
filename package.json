@@ -26,6 +26,8 @@
     "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank",
     "chai": "^4.1.1",
     "ethereumjs-testrpc": "mikefluff/testrpc",
-    "mocha": "^3.5.0"
+    "mocha": "^3.5.0",
+    "sockjs-client": "^1.1.4",
+    "webstomp-client": "^1.0.6"
   }
 }
