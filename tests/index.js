@@ -1,7 +1,7 @@
 require('dotenv/config');
 
 const config = require('../config'),
-  helpers = require('./helpers'),
+  awaitLastBlock = require('./helpers/awaitLastBlock'),
   net = require('net'),
   path = require('path'),
   Web3 = require('web3'),
@@ -9,15 +9,12 @@ const config = require('../config'),
   mongoose = require('mongoose'),
   expect = require('chai').expect,
   SockJS = require('sockjs-client'),
-
   Promise = require('bluebird'),
   transactionModel = require('../models/transactionModel'),
   accountModel = require('../models/accountModel'),
   amqp = require('amqplib'),
   Stomp = require('webstomp-client'),
   ctx = {};
-
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 describe('core/block processor', function () {
 
@@ -26,7 +23,7 @@ describe('core/block processor', function () {
     web3.setProvider(provider);
     mongoose.connect(config.mongo.uri);
 
-    return await helpers.awaitLastBlock(web3);
+    return await awaitLastBlock(web3);
   });
 
   after(() => {
@@ -61,44 +58,6 @@ describe('core/block processor', function () {
     expect(result).to.include({hash: ctx.hash});
   });
 
-
-/*  it('add TIME Asset', async () => { //todo move to sc processor
-
-    let accounts = await Promise.promisify(web3.eth.getAccounts)();
-    let result = await contracts.AssetsManagerInstance.addAsset(
-      contracts.ChronoBankAssetProxyInstance.address, 'TIME', accounts[0], {
-        from: accounts[0],
-        gas: 3000000
-      });
-
-    expect(result).to.have.own.property('tx');
-
-  });
-
-  it('send 100 TIME to owner1 from owner', async () => {
-
-    let accounts = await Promise.promisify(web3.eth.getAccounts)();
-    let result = await contracts.AssetsManagerInstance.sendAsset(
-      helpers.bytes32('TIME'), accounts[1], 100, {
-        from: accounts[0],
-        gas: 3000000
-      });
-
-    expect(result).to.have.own.property('tx');
-
-  });
-
-  it('validate tx in mongo', async () => {
-    await Promise.delay(10000);
-    let accounts = await Promise.promisify(web3.eth.getAccounts)();
-
-    let result = await smEvents.eventModels.Transfer.findOne({
-      symbol: helpers.bytes32('TIME'),
-      to: accounts[1]
-    });
-
-    expect(result).to.have.property('to');
-  });*/
 
   it('send some eth again and validate notification via amqp', async () => {
 
