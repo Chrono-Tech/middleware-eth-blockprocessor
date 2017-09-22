@@ -15,14 +15,19 @@
   },
   "scripts": {
     "lint": "node ./node_modules/eslint/bin/eslint.js -c .eslintrc.js --ext .js --fix --ignore-path .eslintignore .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node ./node_modules/mocha/bin/mocha -t 90000 tests",
+    "testrpc": "node ./ipcConverter.js"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "babel-eslint": "^8.0.0",
     "eslint": "^4.6.1",
-    "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank"
+    "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank",
+    "chai": "^4.1.1",
+    "ethereumjs-testrpc": "mikefluff/testrpc",
+    "mocha": "^3.5.0",
+    "sockjs-client": "^1.1.4",
+    "webstomp-client": "^1.0.6"
   }
 }
