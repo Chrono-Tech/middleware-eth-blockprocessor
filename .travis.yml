@@ -20,11 +20,15 @@ install:
   - npm install -g pm2
 
 before_script:
-    - npm run testrpc > /dev/null &
-    - pm2 start index.js
+    - pm2 start ipcConverter.js
+    - sleep 30 && pm2 start index.js
 
 script:
   - sleep 120 && npm test -- --coverage
+
+after_script:
+  - pm2 logs --nostream
+  - pm2 kill && pkill PM2
 
 notifications:
   email: false
