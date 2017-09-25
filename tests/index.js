@@ -21,7 +21,8 @@ describe('core/block processor', function () {
   before(async () => {
     let provider = new Web3.providers.IpcProvider(config.web3.uri, net);
     web3.setProvider(provider);
-    mongoose.connect(config.mongo.uri);
+    mongoose.Promise = Promise;
+    mongoose.connect(config.mongo.uri, {useMongoClient: true});
 
     return await awaitLastBlock(web3);
   });
