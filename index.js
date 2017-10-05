@@ -38,8 +38,7 @@ const init = async () => {
       let filteredTxs = await blockProcessService(currentBlock, web3);
 
       await Promise.all(
-        filteredTxs.map(tx => tx.save().catch(() => {
-        }))
+        filteredTxs.map(tx => tx.save().catch(() => {}))
       );
 
       await Promise.all(

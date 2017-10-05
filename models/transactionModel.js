@@ -1,6 +1,6 @@
 const mongoose = require('mongoose'),
   config = require('../config'),
-  messages = require('../factories').messages.transactionMessageFactory;
+  messages = require('../factories/messages/transactionMessageFactory');
 
 /** @model transactionModel
  *  @description block model - represents a block in eth
@@ -11,20 +11,15 @@ const Transaction = new mongoose.Schema({
   from: {
     type: String,
     required: true,
-    validate: {
-      validator: (a) => /^(0x)?[0-9a-fA-F]{40}$/.test(a),
-      message: messages.wrongFrom
-    }
+    validate: [ a => /^(0x)?[0-9a-fA-F]{40}$/.test(a), messages.wrongFrom]
+
   },
   gasUsed: {type: String},
   root: {type: String},
   to: {
     type: String,
     required: true,
-    validate: {
-      validator: (a) => /^(0x)?[0-9a-fA-F]{40}$/.test(a),
-      message: messages.wrongTo
-    }
+    validate: [ a => /^(0x)?[0-9a-fA-F]{40}$/.test(a), messages.wrongTo]
   },
   hash: {type: String},
   value: {type: String},

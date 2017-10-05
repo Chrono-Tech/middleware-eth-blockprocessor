@@ -1,5 +1,5 @@
 const mongoose = require('mongoose'),
-  messages = require('../factories').messages.accountMessageFactory;
+  messages = require('../factories/messages/accountMessageFactory');
 
 require('mongoose-long')(mongoose);
 
@@ -15,7 +15,7 @@ const Account = new mongoose.Schema({
   },
   balance: {type: mongoose.Schema.Types.Long, default: 0},
   created: {type: Date, required: true, default: Date.now},
-
+  erc20token : {type: mongoose.Schema.Types.Mixed, default: {}}
 });
 
 module.exports = mongoose.model('EthAccount', Account);

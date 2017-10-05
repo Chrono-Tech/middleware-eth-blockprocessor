@@ -4,20 +4,40 @@ const _ = require('lodash'),
 
 module.exports = async (txs) => {
 
-  let accounts = await accountModel.find({
-    address: {
-      $in: _.chain(txs)
+  let query = {
+    $or: [
+      { address: {
+        $in: _.chain(txs)
+          .map(tx =>
+            _.union(tx.logs.map(log => log.address), [tx.to, tx.from])
+          )
+          .flattenDeep()
+          .uniq()
+          .value()
+      }
+      },
+      { $or: _.chain(txs)
         .map(tx =>
-          _.union(tx.logs.map(log => log.address), [tx.to, tx.from])
+          _.chain([tx.to, tx.from])
+            .transform((acc, val) => {
+              if(!val) return;
+              acc.push({[`erc20token.${val}`]:{$exists: true}});
+            })
+            .value()
         )
         .flattenDeep()
-        .uniq()
+        .uniqWith(_.isEqual)
         .value()
-    }
-  });
-
-  accounts = _.map(accounts, account => account.address);
-
+      }
+    ]
+  };
+  let accounts = await accountModel.find(query);
+  
+  accounts = _.chain(accounts)
+    .map(account => [..._.keys(account.erc20token), account.address])
+    .flattenDeep()
+    .value();
+  
   return _.chain(txs)
     .filter(tx => {
       let emittedAccounts = _.union(tx.logs.map(log => log.address), [tx.to, tx.from]);
