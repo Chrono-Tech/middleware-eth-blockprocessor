@@ -13,6 +13,7 @@ const server = net.createServer(stream => {
 
   stream.on('data', c => {
     request.post('http://localhost:8545', {body: c.toString()}, (err, resp, body) => {
+      if(err) log.error(err);
       try {
         JSON.parse(body);
         stream.write(body);
