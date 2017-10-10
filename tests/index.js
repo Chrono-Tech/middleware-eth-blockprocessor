@@ -10,7 +10,6 @@ const config = require('../config'),
   expect = require('chai').expect,
   SockJS = require('sockjs-client'),
   Promise = require('bluebird'),
-  transactionModel = require('../models/transactionModel'),
   accountModel = require('../models/accountModel'),
   amqp = require('amqplib'),
   Stomp = require('webstomp-client'),
@@ -52,12 +51,12 @@ describe('core/block processor', function () {
   });
 
 
-  it('validate tx in mongo', async () => {
+/*  it('validate tx in mongo', async () => {
     await Promise.delay(10000);
     console.log(ctx.hash);
     let result = await transactionModel.findOne({hash: ctx.hash});
     expect(result).to.include({hash: ctx.hash});
-  });
+  });*/
 
 
   it('send some eth again and validate notification via amqp', async () => {
