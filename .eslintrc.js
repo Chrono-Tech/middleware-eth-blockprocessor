@@ -9,7 +9,8 @@ module.exports = {
     "semi": ["error", "always"],
     "no-console": 1,
     "no-unused-vars": 1,
-    "no-empty": ["error", { "allowEmptyCatch": true }]
+    "curly": ["error", "multi"],
+    "no-empty": ["error", {"allowEmptyCatch": true}]
   },
   "parserOptions": {
     "ecmaVersion": 8

@@ -78,14 +78,14 @@ describe('core/block processor', function () {
         let channel = await amqpInstance.createChannel();
         try {
           await channel.assertExchange('events', 'topic', {durable: false});
-          await channel.assertQueue('app_eth_test.transaction');
-          await channel.bindQueue('app_eth_test.transaction', 'events', 'eth_transaction.*');
+          await channel.assertQueue(`app_${config.rabbit.serviceName}_test.transaction`);
+          await channel.bindQueue(`app_${config.rabbit.serviceName}_test.transaction`, 'events', `${config.rabbit.serviceName}_transaction.*`);
         } catch (e) {
           channel = await amqpInstance.createChannel();
         }
 
         return await new Promise(res =>
-          channel.consume('app_eth_test.transaction', res, {noAck: true})
+          channel.consume(`app_${config.rabbit.serviceName}_test.transaction`, res, {noAck: true})
         )
 
       })(),
@@ -94,7 +94,7 @@ describe('core/block processor', function () {
         let client = Stomp.over(ws, {heartbeat: false, debug: false});
         return await new Promise(res =>
           client.connect('guest', 'guest', () => {
-            client.subscribe('/exchange/events/eth_transaction.*', res)
+            client.subscribe(`/exchange/events/${config.rabbit.serviceName}_transaction.*`, res)
           })
         );
       })()

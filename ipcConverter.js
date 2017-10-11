@@ -12,15 +12,18 @@ RPCServer.listen(8545);
 const server = net.createServer(stream => {
 
   stream.on('data', c => {
-    request.post('http://localhost:8545', {body: c.toString()}, (err, resp, body) => {
-      if(err) log.error(err);
-      try {
-        JSON.parse(body);
-        stream.write(body);
-      } catch (e) {
-        log.error(e);
-      }
-    });
+
+    try {
+      let payload = JSON.parse(c.toString());
+      RPCServer.provider.sendAsync(payload, (err, data) => {
+        stream.write(JSON.stringify(err || data));
+      });
+
+    } catch (e) {
+      log.error(e);
+      stream.write(JSON.stringify({}));
+    }
+
   });
 
 });

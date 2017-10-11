@@ -1,6 +1,6 @@
 const mongoose = require('mongoose'),
   config = require('./config'),
-  blockModel = require('./models').blockModel,
+  blockModel = require('./models/blockModel'),
   _ = require('lodash'),
   bunyan = require('bunyan'),
   Web3 = require('web3'),
@@ -37,26 +37,19 @@ const init = async () => {
     try {
       let filteredTxs = await blockProcessService(currentBlock, web3);
 
-      await Promise.all(
-        filteredTxs.map(tx => tx.save().catch(() => {}))
-      );
+      for (let tx of filteredTxs) {
 
-      await Promise.all(
-        _.chain(filteredTxs)
-          .map(tx =>
-            _.chain([tx.to, tx.from])
-              .union(tx.logs.map(log => log.address))
-              .uniq()
-              .map(address =>
-                eventsEmitterService(amqpInstance, `eth_transaction.${address}`, tx.payload)
-                  .catch(() => {
-                  })
-              )
-              .value()
-          )
-          .flattenDeep()
-          .value()
-      );
+        let addresses = _.chain([tx.to, tx.from])
+          .union(tx.logs.map(log => log.address))
+          .uniq()
+          .value();
+
+        for (let address of addresses)
+          eventsEmitterService(amqpInstance, `${config.rabbit.serviceName}_transaction.${address}`, tx.hash)
+            .catch(() => {
+            });
+
+      }
 
       await blockModel.findOneAndUpdate({network: config.web3.network}, {
         $set: {
@@ -69,7 +62,7 @@ const init = async () => {
       processBlock();
     } catch (err) {
       if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString())
-      {return process.exit(-1);}
+        return process.exit(-1);
 
       if (_.get(err, 'code') === 0) {
         log.info(`await for next block ${currentBlock}`);
