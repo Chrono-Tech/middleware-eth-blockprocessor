@@ -2,8 +2,8 @@ const net = require('net'),
   config = require('./config'),
   bunyan = require('bunyan'),
   fs = require('fs'),
+  path = require('path'),
   log = bunyan.createLogger({name: 'ipcConverter'}),
-  request = require('request'),
   TestRPC = require('ethereumjs-testrpc');
 
 let RPCServer = TestRPC.server();
@@ -12,21 +12,27 @@ RPCServer.listen(8545);
 const server = net.createServer(stream => {
 
   stream.on('data', c => {
-    request.post('http://localhost:8545', {body: c.toString()}, (err, resp, body) => {
-      if(err) log.error(err);
-      try {
-        JSON.parse(body);
-        stream.write(body);
-      } catch (e) {
-        log.error(e);
-      }
-    });
+
+    try {
+      let payload = JSON.parse(c.toString());
+      RPCServer.provider.sendAsync(payload, (err, data) => {
+        stream.write(JSON.stringify(err || data));
+      });
+
+    } catch (e) {
+      log.error(e);
+      stream.write(JSON.stringify({}));
+    }
+
   });
 
 });
 
-if (!/^win/.test(process.platform) && !fs.existsSync(`/tmp/${config.web3.network}`)) {
-  fs.mkdirSync(`/tmp/${config.web3.network}`);
+if (!/^win/.test(process.platform)) {
+  let pathIpc = path.parse(config.web3.uri).dir;
+
+  if (!fs.existsSync(pathIpc))
+    fs.mkdirSync(pathIpc);
 }
 
 server.listen(config.web3.uri, () => {
