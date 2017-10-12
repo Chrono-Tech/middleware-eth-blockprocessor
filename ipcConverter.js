@@ -2,8 +2,8 @@ const net = require('net'),
   config = require('./config'),
   bunyan = require('bunyan'),
   fs = require('fs'),
+  path = require('path'),
   log = bunyan.createLogger({name: 'ipcConverter'}),
-  request = require('request'),
   TestRPC = require('ethereumjs-testrpc');
 
 let RPCServer = TestRPC.server();
@@ -28,8 +28,11 @@ const server = net.createServer(stream => {
 
 });
 
-if (!/^win/.test(process.platform) && !fs.existsSync(`/tmp/${config.web3.network}`)) {
-  fs.mkdirSync(`/tmp/${config.web3.network}`);
+if (!/^win/.test(process.platform)) {
+  let pathIpc = path.parse(config.web3.uri).dir;
+
+  if (!fs.existsSync(pathIpc))
+    fs.mkdirSync(pathIpc);
 }
 
 server.listen(config.web3.uri, () => {
