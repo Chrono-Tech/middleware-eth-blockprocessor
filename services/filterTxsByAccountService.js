@@ -1,43 +1,44 @@
 const _ = require('lodash'),
-  accountModel = require('../models').accountModel,
-  transactionModel = require('../models').transactionModel;
+  accountModel = require('../models/accountModel');
 
 module.exports = async (txs) => {
 
   let query = {
     $or: [
-      { address: {
-        $in: _.chain(txs)
+      {
+        address: {
+          $in: _.chain(txs)
+            .map(tx =>
+              _.union(tx.logs.map(log => log.address), [tx.to, tx.from])
+            )
+            .flattenDeep()
+            .uniq()
+            .value()
+        }
+      },
+      {
+        $or: _.chain(txs)
           .map(tx =>
-            _.union(tx.logs.map(log => log.address), [tx.to, tx.from])
+            _.chain([tx.to, tx.from])
+              .transform((acc, val) => {
+                if (!val) return;
+                acc.push({[`erc20token.${val}`]: {$exists: true}});
+              })
+              .value()
           )
           .flattenDeep()
-          .uniq()
+          .uniqWith(_.isEqual)
           .value()
-      }
-      },
-      { $or: _.chain(txs)
-        .map(tx =>
-          _.chain([tx.to, tx.from])
-            .transform((acc, val) => {
-              if(!val) return;
-              acc.push({[`erc20token.${val}`]:{$exists: true}});
-            })
-            .value()
-        )
-        .flattenDeep()
-        .uniqWith(_.isEqual)
-        .value()
       }
     ]
   };
   let accounts = await accountModel.find(query);
-  
+
   accounts = _.chain(accounts)
     .map(account => [..._.keys(account.erc20token), account.address])
     .flattenDeep()
     .value();
-  
+
   return _.chain(txs)
     .filter(tx => {
       let emittedAccounts = _.union(tx.logs.map(log => log.address), [tx.to, tx.from]);
@@ -45,11 +46,6 @@ module.exports = async (txs) => {
       return _.find(accounts, account =>
         emittedAccounts.includes(account)
       );
-    })
-    .map(tx => {
-      tx.value = parseInt(tx.value);
-      tx.blockNumber = parseInt(tx.blockNumber, 16);
-      return new transactionModel(tx);
     })
     .value();
 

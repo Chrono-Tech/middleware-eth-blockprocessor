@@ -1,4 +1,4 @@
-const blockModel = require('../../models').blockModel,
+const blockModel = require('../../models/blockModel'),
   config = require('../../config'),
   _ = require('lodash'),
   Promise = require('bluebird');
