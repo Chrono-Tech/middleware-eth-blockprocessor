@@ -16,7 +16,9 @@ const server = net.createServer(stream => {
     try {
       let payload = JSON.parse(c.toString());
       RPCServer.provider.sendAsync(payload, (err, data) => {
+        stream.cork();
         stream.write(JSON.stringify(err || data));
+        process.nextTick(() => stream.uncork());
       });
 
     } catch (e) {
