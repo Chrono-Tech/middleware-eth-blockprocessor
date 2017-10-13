@@ -23,7 +23,10 @@ const server = net.createServer(stream => {
 
     } catch (e) {
       log.error(e);
-      stream.write(JSON.stringify({}));
+      stream.write(JSON.stringify({
+        message: e,
+        code: -32000
+      }));
     }
 
   });
