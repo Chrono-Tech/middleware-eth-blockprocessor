@@ -11,7 +11,6 @@ const mongoose = require('mongoose'),
   log = bunyan.createLogger({name: 'app'}),
   blockProcessService = require('./services/blockProcessService');
 
-
 /**
  * @module entry point
  * @description registers all smartContract's events,
@@ -51,6 +50,17 @@ const init = async () => {
 
   await channel.assertExchange('events', 'topic', {durable: false});
 
+  web3.eth.filter('pending').watch(async (err, result) => {
+    if (err)
+      return;
+
+    let tx = await Promise.promisify(web3.eth.getTransaction)(result);
+    tx = _.omit(tx, ['blockHash', 'transactionIndex']);
+    tx.blockNumber = -1;
+    for (let address of [tx.from, tx.to])
+      await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
+  });
+
   let processBlock = async () => {
     try {
       let filteredTxs = await blockProcessService(currentBlock, web3);
@@ -63,8 +73,7 @@ const init = async () => {
           .value();
 
         for (let address of addresses)
-          await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx.hash)));
-
+          await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
       }
 
       await blockModel.findOneAndUpdate({network: config.web3.network}, {
