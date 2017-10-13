@@ -9,8 +9,8 @@ const mongoose = require('mongoose'),
   amqp = require('amqplib'),
   Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app'}),
-  blockProcessService = require('./services/blockProcessService'),
-  eventsEmitterService = require('./services/eventsEmitterService');
+  blockProcessService = require('./services/blockProcessService');
+
 
 /**
  * @module entry point
@@ -31,7 +31,25 @@ const init = async () => {
   const web3 = new Web3();
   web3.setProvider(provider);
 
-  let amqpInstance = await amqp.connect(config.rabbit.url);
+  web3.currentProvider.connection.on('end', () => {
+    log.error('ipc process has finished!');
+    process.exit(0);
+  });
+
+  let amqpInstance = await amqp.connect(config.rabbit.url)
+    .catch(() => {
+      log.error('rabbitmq process has finished!');
+      process.exit(0);
+    });
+
+  let channel = await amqpInstance.createChannel();
+
+  channel.on('close', () => {
+    log.error('rabbitmq process has finished!');
+    process.exit(0);
+  });
+
+  await channel.assertExchange('events', 'topic', {durable: false});
 
   let processBlock = async () => {
     try {
@@ -45,9 +63,7 @@ const init = async () => {
           .value();
 
         for (let address of addresses)
-          eventsEmitterService(amqpInstance, `${config.rabbit.serviceName}_transaction.${address}`, tx.hash)
-            .catch(() => {
-            });
+          await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx.hash)));
 
       }
 
