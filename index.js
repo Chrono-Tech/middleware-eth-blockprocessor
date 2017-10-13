@@ -63,7 +63,7 @@ const init = async () => {
 
   let processBlock = async () => {
     try {
-      let filteredTxs = await blockProcessService(currentBlock, web3);
+      let filteredTxs = await Promise.resolve(blockProcessService(currentBlock, web3)).timeout(20000);
 
       for (let tx of filteredTxs) {
 
@@ -86,6 +86,10 @@ const init = async () => {
       currentBlock++;
       processBlock();
     } catch (err) {
+
+      if(err instanceof Promise.TimeoutError)
+        return processBlock();
+
       if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString())
         return process.exit(-1);
 
