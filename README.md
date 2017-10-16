@@ -2,7 +2,7 @@
 
 Middleware service for handling incoming transactions
 
-###Installation
+### Installation
 
 This module is a part of middleware services. You can install it in 2 ways:
 
@@ -26,7 +26,7 @@ Block processor connects to ipc and fetch blocks one by one. The current prcesse
 }
 ```
 
-Which txs block processor save?
+Which txs block processor filter?
 
 Block processor filter txs by specified user accounts (addresses). The addresses are presented in "ethaccounts" collection with the following format:
 ```
@@ -45,12 +45,10 @@ eth.sendTransaction({from: eth.accounts[0], to: eth.accounts[1], value: 200})
 ```
 
 this tx is going to be included in next blocks. Block parser fetch these blocks, and filter by "to" and "from" recipients, or by addresses from logs (in case we want to catch event).
-If one of them is presented in ethaccounts collection in mongo, then this transaction will be saved in "ethtransactions" collection.
+If one of them is presented in ethaccounts collection in mongo, then this transaction will be broadcasted via rabbitmq.
 
 ```
 {
-    "_id" : ObjectId("599fda2931a8353700ee951f"),
-    "payload" : "3:0xb432ff1b436ab7f2e6f611f6a52d3a44492c176e1eb5211ad31e21313d4a274f",
     "hash" : "0xb432ff1b436ab7f2e6f611f6a52d3a44492c176e1eb5211ad31e21313d4a274f",
     "blockHash" : "0x6ab9c9c59749fe43557876836066854d84e7e936c1f27832c05642762d16eb0a",
     "blockNumber" : "3",
@@ -77,20 +75,17 @@ If one of them is presented in ethaccounts collection in mongo, then this transa
 }
 ```
 
-
-All field are the same, as in eth transactio schema, except _id, payload fields. The payload - is a unique indentifier, which is a mix of block_number and hash - block_number:hash.
-
 Why do we use rabbitmq?
 
 
-Rabbitmq is used for 2 main reasons - the first one for inner communication between different core modules. And the second one - is for notification purpose. When a new transaction arrives and it satisfies the filter - block processor notiffy others about it though rabbitmq exhange strategy. The exnage is called 'events', and it has different kinds of routing keys. For a new tx the routing key is looked like so:
+Rabbitmq is used for 2 main reasons - the first one for inner communication between different core modules. And the second one - is for notification purpose. When a new transaction arrives and it satisfies the filter - block processor notiffy others about it though rabbitmq exhange strategy. The exchage is called 'events', and it has different kinds of routing keys. For a new tx the routing key is looked like so:
 
 ```
-eth_transaction.{address}
+<RABBIT_SERVICE_NAME>_transaction.{address}
 ```
 Where address is to or from address. Also, you can subscribe to all eth_transactions events by using wildcard:
 ```
-eth_transaction.*
+<RABBIT_SERVICE_NAME>_transaction.*
 ```
 
 All in all, in order to be subscribed, you need to do the following:
@@ -110,10 +105,9 @@ Below is the expamle configuration:
 ```
 MONGO_URI=mongodb://localhost:27017/data
 RABBIT_URI=amqp://localhost:5672
-SMART_CONTRACTS_EVENTS_LISTEN=1
-SMART_CONTRACTS_EVENTS_TTL=0
-TRANSACTION_TTL=0
+RABBIT_SERVICE_NAME=app_eth
 NETWORK=development
+WEB3_URI=/tmp/development/geth.ipc
 ```
 
 The options are presented below:
@@ -122,9 +116,9 @@ The options are presented below:
 | ------ | ------ |
 | MONGO_URI   | the URI string for mongo connection
 | RABBIT_URI   | rabbitmq URI connection string
-| SMART_CONTRACTS_EVENTS_TTL   | how long should we keep events in db (should be set in seconds)
-| TRANSACTION_TTL   | how long should we keep transactions in db (should be set in seconds)
+| RABBIT_SERVICE_NAME   | namespace for all rabbitmq queues, like 'app_eth_transaction'
 | NETWORK   | network name (alias)- is used for connecting via ipc (see block processor section)
+| WEB3_URI   | the path to ipc interface
 
 License
 ----
