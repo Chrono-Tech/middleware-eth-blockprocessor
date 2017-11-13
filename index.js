@@ -1,3 +1,11 @@
+/**
+ * Middleware service for handling emitted events on chronobank platform
+ * @module Chronobank/eth-blockprocessor
+ * @requires config
+ * @requires models/blockModel
+ * @requires services/blockProcessService
+ */
+
 const mongoose = require('mongoose'),
   config = require('./config'),
   blockModel = require('./models/blockModel'),
@@ -10,12 +18,6 @@ const mongoose = require('mongoose'),
   Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app'}),
   blockProcessService = require('./services/blockProcessService');
-
-/**
- * @module entry point
- * @description registers all smartContract's events,
- * listen for changes, and notify plugins.
- */
 
 mongoose.Promise = Promise;
 mongoose.connect(config.mongo.uri, {useMongoClient: true});
@@ -61,12 +63,15 @@ const init = async () => {
       await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
   });
 
+  /**
+   * Recursive routine for processing incoming blocks.
+   * @return {undefined}
+   */
   let processBlock = async () => {
     try {
       let filteredTxs = await Promise.resolve(blockProcessService(currentBlock, web3)).timeout(20000);
 
       for (let tx of filteredTxs) {
-
         let addresses = _.chain([tx.to, tx.from])
           .union(tx.logs.map(log => log.address))
           .uniq()
