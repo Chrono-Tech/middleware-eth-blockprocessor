@@ -1,8 +1,13 @@
+/**
+ * Transaction filter
+ * @module services/filterTxsByAccount
+ * @requires models/accountModel
+ */
+
 const _ = require('lodash'),
   accountModel = require('../models/accountModel');
 
 module.exports = async (txs) => {
-
   let query = {
     $or: [
       {
@@ -32,6 +37,7 @@ module.exports = async (txs) => {
       }
     ]
   };
+
   let accounts = await accountModel.find(query);
 
   accounts = _.chain(accounts)
@@ -48,5 +54,4 @@ module.exports = async (txs) => {
       );
     })
     .value();
-
 };
