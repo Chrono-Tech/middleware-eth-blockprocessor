@@ -22,6 +22,12 @@ const mongoose = require('mongoose'),
 mongoose.Promise = Promise;
 mongoose.connect(config.mongo.uri, {useMongoClient: true});
 
+mongoose.connection.on('disconnected', function () {
+  log.error('mongo disconnected!');
+  process.exit(0);
+});
+
+
 const init = async () => {
 
   let currentBlock = await blockModel.findOne({network: config.web3.network}).sort('-block');
