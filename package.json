@@ -23,10 +23,10 @@
   "description": "",
   "devDependencies": {
     "babel-eslint": "^8.0.0",
+    "chai": "^4.1.1",
     "eslint": "^4.6.1",
     "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank",
-    "chai": "^4.1.1",
-    "ethereumjs-testrpc": "mikefluff/testrpc",
+    "ethereumjs-testrpc": "^6.0.3",
     "mocha": "^3.5.0",
     "sockjs-client": "^1.1.4",
     "webstomp-client": "^1.0.6"
