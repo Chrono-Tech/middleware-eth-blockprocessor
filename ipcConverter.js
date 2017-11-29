@@ -9,11 +9,25 @@ const net = require('net'),
   bunyan = require('bunyan'),
   fs = require('fs'),
   path = require('path'),
+  _ = require('lodash'),
   log = bunyan.createLogger({name: 'ipcConverter'}),
   TestRPC = require('ethereumjs-testrpc');
 
 let RPCServer = TestRPC.server();
 RPCServer.listen(8545);
+
+let addresses = _.chain(RPCServer.provider.manager.state.accounts)
+  .toPairs()
+  .map(pair=> {
+    pair[1] = Buffer.from(pair[1].secretKey, 'hex').toString('hex');
+    return pair;
+  })
+  .fromPairs()
+  .value();
+
+console.log(addresses);
+
+
 
 // create RPC server
 const server = net.createServer(stream => {
