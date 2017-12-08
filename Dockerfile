@@ -6,14 +6,14 @@ RUN apt update && \
     npm install -g pm2@2.7.1 && \
     mkdir /app
 WORKDIR /app
-RUN git clone https://github.com/ChronoBank/Middleware.git src
-RUN cd src && \
-    npm -g install --unsafe-perm=true && \
-    node . middleware-eth-blockprocessor && \
-    node . middleware-eth-rest && \
-    node . middleware-eth-chrono-sc-processor && \
-    node . middleware-eth-balance-processor && \
-    node . middleware-eth-ipfs && \
-    node . middleware-eth-erc20
+RUN npm install -g chronobank-middleware
+RUN mkdir src && cd src && \
+    dmt init && \
+    dmt install middleware-eth-blockprocessor \
+    middleware-eth-rest \
+    middleware-eth-chrono-sc-processor \
+    middleware-eth-balance-processor \
+    middleware-eth-ipfs \
+    middleware-eth-erc20
 EXPOSE 8080
 CMD pm2-docker start /mnt/config/${NETWORK_TYPE}/ecosystem.config.js
