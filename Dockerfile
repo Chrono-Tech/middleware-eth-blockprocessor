@@ -14,6 +14,7 @@ RUN mkdir src && cd src && \
     middleware-eth-chrono-sc-processor \
     middleware-eth-balance-processor \
     middleware-eth-ipfs \
-    middleware-eth-erc20
+    middleware-eth-erc20 \
+    middleware-eth-nem-action-processor
 EXPOSE 8080
 CMD pm2-docker start /mnt/config/${NETWORK_TYPE}/ecosystem.config.js
