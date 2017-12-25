@@ -8,25 +8,29 @@
 
 const mongoose = require('mongoose'),
   config = require('./config'),
-  blockModel = require('./models/blockModel'),
+  Promise = require('bluebird');
+
+mongoose.Promise = Promise;
+mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
+mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri, {useMongoClient: true});
+
+const blockModel = require('./models/blockModel'),
   _ = require('lodash'),
   bunyan = require('bunyan'),
   Web3 = require('web3'),
   web3Errors = require('web3/lib/web3/errors'),
   net = require('net'),
   amqp = require('amqplib'),
-  Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app'}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService'),
   blockProcessService = require('./services/blockProcessService');
 
-mongoose.Promise = Promise;
-mongoose.connect(config.mongo.uri, {useMongoClient: true});
-
-mongoose.connection.on('disconnected', function () {
-  log.error('mongo disconnected!');
-  process.exit(0);
-});
+[mongoose.accounts, mongoose.connection].forEach(connection =>
+  connection.on('disconnected', function () {
+    log.error('mongo disconnected!');
+    process.exit(0);
+  })
+);
 
 const init = async () => {
 
