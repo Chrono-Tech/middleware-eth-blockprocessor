@@ -1,15 +1,20 @@
 require('dotenv/config');
 
 const config = require('../config'),
-  awaitLastBlock = require('./helpers/awaitLastBlock'),
+  Promise = require('bluebird'),
+  mongoose = require('mongoose');
+
+mongoose.Promise = Promise;
+mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri);
+mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
+
+const awaitLastBlock = require('./helpers/awaitLastBlock'),
   net = require('net'),
+  WebSocket = require('ws'),
   path = require('path'),
   Web3 = require('web3'),
   web3 = new Web3(),
-  mongoose = require('mongoose'),
   expect = require('chai').expect,
-  SockJS = require('sockjs-client'),
-  Promise = require('bluebird'),
   accountModel = require('../models/accountModel'),
   amqp = require('amqplib'),
   Stomp = require('webstomp-client'),
@@ -20,8 +25,6 @@ describe('core/block processor', function () {
   before(async () => {
     let provider = new Web3.providers.IpcProvider(config.web3.uri, net);
     web3.setProvider(provider);
-    mongoose.Promise = Promise;
-    mongoose.connect(config.mongo.uri, {useMongoClient: true});
 
     return await awaitLastBlock(web3);
   });
@@ -35,9 +38,7 @@ describe('core/block processor', function () {
     let accounts = await Promise.promisify(web3.eth.getAccounts)();
     try {
       await new accountModel({address: accounts[0]}).save();
-    } catch (e) {
-      console.log(e);
-    }
+    } catch (e) {}
   });
 
   it('send some eth from 0 account to account 1', async () => {
@@ -85,7 +86,7 @@ describe('core/block processor', function () {
         })
       })(),
       (async () => {
-        let ws = new SockJS('http://localhost:15674/stomp');
+        let ws = new WebSocket('ws://localhost:15674/ws');
         let client = Stomp.over(ws, {heartbeat: false, debug: false});
         return await new Promise(res =>
           client.connect('guest', 'guest', () => {
