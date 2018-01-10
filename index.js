@@ -67,6 +67,10 @@ const init = async () => {
         return;
 
       let tx = await Promise.promisify(web3.eth.getTransaction)(result);
+
+      if (!_.has(tx, 'hash'))
+        return;
+
       let receipt = Promise.promisify(web3.eth.getTransactionReceipt)(tx.hash);
       tx.logs = _.get(receipt, 'logs', []);
 
