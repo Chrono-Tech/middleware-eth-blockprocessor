@@ -103,7 +103,12 @@ To apply your configuration, create a .env file in root folder of repo (in case 
 Below is the expamle configuration:
 
 ```
-MONGO_URI=mongodb://localhost:27017/data
+MONGO_ACCOUNTS_URI=mongodb://localhost:27017/data
+MONGO_ACCOUNTS_COLLECTION_PREFIX=eth
+
+MONGO_DATA_URI=mongodb://localhost:27017/data
+MONGO_DATA_COLLECTION_PREFIX=eth
+
 RABBIT_URI=amqp://localhost:5672
 RABBIT_SERVICE_NAME=app_eth
 NETWORK=development
@@ -115,6 +120,11 @@ The options are presented below:
 | name | description|
 | ------ | ------ |
 | MONGO_URI   | the URI string for mongo connection
+| MONGO_COLLECTION_PREFIX   | the default prefix for all mongo collections. The default value is 'eth'
+| MONGO_ACCOUNTS_URI   | the URI string for mongo connection, which holds users accounts (if not specified, then default MONGO_URI connection will be used)
+| MONGO_ACCOUNTS_COLLECTION_PREFIX   | the collection prefix for accounts collection in mongo (If not specified, then the default MONGO_COLLECTION_PREFIX will be used)
+| MONGO_DATA_URI   | the URI string for mongo connection, which holds data collections (for instance, processed block's height). In case, it's not specified, then default MONGO_URI connection will be used)
+| MONGO_DATA_COLLECTION_PREFIX   | the collection prefix for data collections in mongo (If not specified, then the default MONGO_COLLECTION_PREFIX will be used)
 | RABBIT_URI   | rabbitmq URI connection string
 | RABBIT_SERVICE_NAME   | namespace for all rabbitmq queues, like 'app_eth_transaction'
 | NETWORK   | network name (alias)- is used for connecting via ipc (see block processor section)
