@@ -9,6 +9,7 @@ const _ = require('lodash'),
 
 module.exports = async (txs) => {
   let query = {
+    isActive: {$ne: false},
     $or: [
       {
         address: {

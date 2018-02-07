@@ -24,9 +24,6 @@ const config = {
   web3: {
     network: process.env.NETWORK || 'development',
     uri: `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${process.env.WEB3_URI || `/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
-  },
-  transactions: {
-    ttl: parseInt(process.env.TRANSACTION_TTL) || false
   }
 };
 
