@@ -1,7 +1,6 @@
 /**
  * Transaction filter
  * @module services/filterTxsByAccount
- * @requires models/accountModel
  */
 
 const _ = require('lodash'),

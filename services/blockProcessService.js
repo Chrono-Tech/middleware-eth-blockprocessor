@@ -1,7 +1,6 @@
 /**
  * Block processor
  * @module services/blockProcess
- * @requires services/filterTxsByAccount
  */
 const _ = require('lodash'),
   Promise = require('bluebird'),
@@ -10,25 +9,35 @@ const _ = require('lodash'),
 /**
  * Block processor routine
  * @param  {number} currentBlock Current block
- * @param  {number} web3         Latest block from network
+ * @param  {Object} web3         Latest block from network
+ * @param  {array} lastBlocks    Previous hashes of blocks (the number is defined in config)
  * @return {array}               Filtered transactions
  */
 
-module.exports = async (currentBlock, web3) => {
+module.exports = async (currentBlock, web3, lastBlocks) => {
   /**
    * Get latest block number from network
    * @type {number}
    */
   let block = await Promise.promisify(web3.eth.getBlockNumber)();
 
-  if (block <= currentBlock)
+  if (block === currentBlock) //heads are equal
     return Promise.reject({code: 0});
+
+  if (block < currentBlock)
+    return Promise.reject({code: 1}); //head has been blown off
+
+  const lastBlockHashes = await Promise.mapSeries(lastBlocks, async blockHash => await Promise.promisify(web3.eth.getBlock)(blockHash, false));
+
+  if (_.compact(lastBlockHashes).length !== lastBlocks.length)
+    return Promise.reject({code: 1}); //head has been blown off
 
   /**
    * Get raw block
    * @type {Object}
    */
   let rawBlock = await Promise.promisify(web3.eth.getBlock)(currentBlock + 1, true);
+
 
   if (!rawBlock.transactions || _.isEmpty(rawBlock.transactions))
     return Promise.reject({code: 2});
@@ -44,5 +53,9 @@ module.exports = async (currentBlock, web3) => {
     return tx;
   });
 
-  return await filterTxsByAccountService(rawBlock.transactions);
+  const filteredTxs = await filterTxsByAccountService(rawBlock.transactions);
+  return {
+    block: rawBlock,
+    filteredTxs: filteredTxs
+  };
 };
