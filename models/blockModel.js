@@ -8,9 +8,13 @@ const mongoose = require('mongoose'),
   config = require('../config');
 
 const Block = new mongoose.Schema({
-  block: {type: Number},
+  number: {type: Number, unique: true},
+  hash: {type: String, unique: true},
+  transactions: [{type: mongoose.Schema.Types.Mixed}],
   network: {type: String},
   created: {type: Date, required: true, default: Date.now}
 });
+
+Block.index({number: 1, 'transactions.to': 1, 'transactions.from': 1, 'transactions.hash': 1});
 
 module.exports = mongoose.model(`${config.mongo.data.collectionPrefix}Block`, Block);

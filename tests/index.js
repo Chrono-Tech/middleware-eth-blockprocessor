@@ -11,7 +11,6 @@ mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
 const awaitLastBlock = require('./helpers/awaitLastBlock'),
   net = require('net'),
   WebSocket = require('ws'),
-  path = require('path'),
   Web3 = require('web3'),
   web3 = new Web3(),
   expect = require('chai').expect,
