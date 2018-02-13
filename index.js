@@ -48,7 +48,7 @@ const init = async () => {
   let currentBlock = _.chain(currentBlocks).get('0.number', 0).add(0).value();
   log.info(`search from block:${currentBlock} for network:${config.web3.network}`);
 
-  let lastBlocks = _.chain(currentBlocks).map(block => block.hash).reverse().value();
+  let lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
   const provider = new Web3.providers.IpcProvider(config.web3.uri, net);
   const web3 = new Web3();
   web3.setProvider(provider);
@@ -87,7 +87,7 @@ const init = async () => {
 
     const data = await filterTxsByAccountService([tx]);
 
-    for (let filteredTx of data.filteredTxs) {
+    for (let filteredTx of data) {
 
       let addresses = _.chain([filteredTx.to, filteredTx.from])
         .union(filteredTx.logs.map(log => log.address))
@@ -110,7 +110,7 @@ const init = async () => {
     try {
       const data = await Promise.resolve(blockProcessService(currentBlock, web3, lastBlocks)).timeout(20000);
 
-      for (let tx of data.filteredTxs) {
+      for (let tx of data) {
         let addresses = _.chain([tx.to, tx.from])
           .union(tx.logs.map(log => log.address))
           .uniq()
