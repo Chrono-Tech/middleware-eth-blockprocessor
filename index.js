@@ -31,6 +31,19 @@ const blockModel = require('./models/blockModel'),
 
 const init = async () => {
 
+  log.info('indexing...');
+
+  await new Promise((res, rej) =>
+    blockModel.on('index', error =>
+      error ? rej(error) : res()
+    )
+  ).catch(err => {
+    log.info(`index error: ${err}`);
+    return process.exit(0);
+  });
+
+  log.info('indexation completed!');
+
   const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
   let currentBlock = _.chain(currentBlocks).get('0.number', 0).add(0).value();
   log.info(`search from block:${currentBlock} for network:${config.web3.network}`);
@@ -108,10 +121,10 @@ const init = async () => {
       }
 
       await blockModel.findOneAndUpdate({
-        number: data.block.number
-      },
-      _.merge({network: config.web3.network}, data.block),
-      {upsert: true}
+          number: data.block.number
+        },
+        _.merge({network: config.web3.network}, data.block),
+        {upsert: true}
       );
 
       _.pullAt(lastBlocks, 0);
