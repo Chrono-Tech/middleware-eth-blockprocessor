@@ -24,6 +24,12 @@ module.exports = async (currentBlock, web3, lastBlocks) => {
   if (block === currentBlock) //heads are equal
     return Promise.reject({code: 0});
 
+  if (block === 0) {
+    let syncState = await Promise.promisify(web3.eth.getSyncing)();
+    if (syncState.currentBlock !== 0)
+      return Promise.reject({code: 0});
+  }
+
   if (block < currentBlock)
     return Promise.reject({code: 1}); //head has been blown off
 
@@ -37,7 +43,6 @@ module.exports = async (currentBlock, web3, lastBlocks) => {
    * @type {Object}
    */
   let rawBlock = await Promise.promisify(web3.eth.getBlock)(currentBlock + 1, true);
-
 
   if (!rawBlock.transactions || _.isEmpty(rawBlock.transactions))
     return Promise.reject({code: 2});

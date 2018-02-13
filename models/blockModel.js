@@ -15,6 +15,6 @@ const Block = new mongoose.Schema({
   created: {type: Date, required: true, default: Date.now}
 });
 
-Block.index({number: 1, 'transactions.to': 1, 'transactions.from': 1, 'transactions.hash': 1});
+Block.index({number: 1, 'transactions.to': 1, 'transactions.from': 1, 'transactions.hash': 1, 'transactions.logs.address': 1, 'transactions.logs.topics': 1});
 
 module.exports = mongoose.model(`${config.mongo.data.collectionPrefix}Block`, Block);
