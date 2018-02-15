@@ -31,7 +31,10 @@ class BlockCacheService {
     this.currentHeight = _.chain(currentBlocks).get('0.number', -1).add(1).value();
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
+    this.doJob();
+  }
 
+  async doJob () {
     while (this.isSyncing) {
       try {
         let block = await this.processBlock();
@@ -62,7 +65,6 @@ class BlockCacheService {
           this.currentHeight = lastCheckpointBlock - 1;
         }
       }
-
     }
   }
 
@@ -117,7 +119,6 @@ class BlockCacheService {
     await blockModel.init();
     log.info('indexation completed!');
   }
-
 
   async isSynced () {
     const height = await Promise.promisify(this.web3.eth.getBlockNumber)();
