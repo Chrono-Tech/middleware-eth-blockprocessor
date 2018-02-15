@@ -71,6 +71,8 @@ const init = async () => {
   await blockCacheService.startSync();
 
   web3.eth.filter('pending').watch(async (err, result) => {
+
+    console.log(result)
     if (err || !await blockCacheService.isSynced())
       return;
 
