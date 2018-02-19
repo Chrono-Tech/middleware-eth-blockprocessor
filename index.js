@@ -54,7 +54,8 @@ const init = async () => {
 
   await channel.assertExchange('events', 'topic', {durable: false});
 
-  blockCacheService.events.on('block', async block=>{
+  blockCacheService.events.on('block', async block => {
+    log.info('%s (%d) added to cache.', block.hash, block.number);
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
     for (let tx of filteredTxs) {
@@ -72,24 +73,20 @@ const init = async () => {
 
   web3.eth.filter('pending').watch(async (err, result) => {
 
-    console.log(result)
     if (err || !await blockCacheService.isSynced())
       return;
 
     let tx = await Promise.promisify(web3.eth.getTransaction)(result);
 
+    tx.logs = [];
     if (!_.has(tx, 'hash'))
       return;
-
-    let receipt = Promise.promisify(web3.eth.getTransactionReceipt)(tx.hash);
-    tx.logs = _.get(receipt, 'logs', []);
 
     const data = await filterTxsByAccountService([tx]);
 
     for (let filteredTx of data) {
 
       let addresses = _.chain([filteredTx.to, filteredTx.from])
-        .union(filteredTx.logs.map(log => log.address))
         .uniq()
         .value();
 
