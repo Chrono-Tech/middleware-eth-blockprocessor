@@ -22,16 +22,27 @@ class BlockCacheService {
     this.currentHeight = 0;
     this.lastBlocks = [];
     this.isSyncing = false;
+    this.pendingTxCallback = (err, tx) => this.UnconfirmedTxEvent(err, tx);
   }
 
   async startSync () {
+    if (this.isSyncing)
+      return;
+
     await this.indexCollection();
     this.isSyncing = true;
+
+    const pendingBlock = await Promise.promisify(this.web3.eth.getBlock)('pending');
+    if (!pendingBlock)
+      await blockModel.remove({number: -1});
+
     const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
     this.currentHeight = _.chain(currentBlocks).get('0.number', -1).add(1).value();
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
     this.doJob();
+    this.web3.eth.filter('pending').watch(this.pendingTxCallback);
+
   }
 
   async doJob () {
@@ -39,6 +50,16 @@ class BlockCacheService {
       try {
         let block = await this.processBlock();
         await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
+        await blockModel.update({number: -1}, {
+          $pull: {
+            transactions: {
+              hash: {
+                $in: block.transactions.map(tx => tx.hash)
+              }
+            }
+          }
+        });
+
         this.currentHeight++;
         _.pullAt(this.lastBlocks, 0);
         this.lastBlocks.push(block.hash);
@@ -68,8 +89,27 @@ class BlockCacheService {
     }
   }
 
+  async UnconfirmedTxEvent (err) {
+
+    if (err)
+      return;
+
+    const block = await Promise.promisify(this.web3.eth.getBlock)('pending', true);
+    let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || {
+        number: -1,
+        hash: null,
+        timestamp: 0,
+        txs: []
+      };
+
+    _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
+
+    await blockModel.findOneAndUpdate({number: -1}, currentUnconfirmedBlock, {upsert: true});
+  }
+
   async stopSync () {
     this.isSyncing = false;
+    this.web3.eth.filter.stopWatching(this.pendingTxCallback);
   }
 
   async processBlock () {
