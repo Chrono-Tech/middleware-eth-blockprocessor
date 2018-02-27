@@ -10,12 +10,12 @@ mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
 
 const awaitLastBlock = require('./helpers/awaitLastBlock'),
   clearMongoBlocks = require('./helpers/clearMongoBlocks'),
+  saveAccountForAddress = require('./helpers/saveAccountForAddress'),
   net = require('net'),
   WebSocket = require('ws'),
   Web3 = require('web3'),
   web3 = new Web3(),
   expect = require('chai').expect,
-  accountModel = require('../models/accountModel'),
   amqp = require('amqplib'),
   Stomp = require('webstomp-client'),
   ctx = {};
@@ -30,6 +30,7 @@ describe('core/block processor', function () {
     web3.setProvider(provider);
 
     accounts = await Promise.promisify(web3.eth.getAccounts)();
+    await saveAccountForAddress(accounts[0]);
     return await awaitLastBlock(web3);
   });
 
@@ -39,11 +40,6 @@ describe('core/block processor', function () {
     return mongoose.disconnect();
   });
 
-  it('add account to mongo', async () => {
-    try {
-      await new accountModel({address: accounts[0]}).save();
-    } catch (e) {}
-  });
 
   it('send some eth from 0 account to account 1', async () => {
     ctx.hash = await Promise.promisify(web3.eth.sendTransaction)({
@@ -82,6 +78,7 @@ describe('core/block processor', function () {
 
     try {
       await channel.assertExchange('events', 'topic', {durable: false});
+      await channel.purgeQueue(`app_${config.rabbit.serviceName}_test.transaction`);
     } catch (e) {
       channel = await amqpInstance.createChannel();
     }
@@ -139,6 +136,7 @@ describe('core/block processor', function () {
 
     try {
       await channel.assertExchange('events', 'topic', {durable: false});
+      await channel.purgeQueue(`app_${config.rabbit.serviceName}_test.transaction`);      
     } catch (e) {
       channel = await amqpInstance.createChannel();
     }
