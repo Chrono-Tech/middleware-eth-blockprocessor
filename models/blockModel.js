@@ -12,7 +12,7 @@ const Block = new mongoose.Schema({
   hash: {type: String, unique: true, index: true},
   timestamp: {type: Number, required: true, index: true},
   transactions: [{
-    value: {type: String},
+    value: {type: Number},
     transactionIndex: {type: Number},
     to: {type: String, index: true},
     nonce: {type: Number},
