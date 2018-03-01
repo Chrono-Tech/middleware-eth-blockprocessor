@@ -92,7 +92,6 @@ describe('core/block processor', function () {
         const channel = await amqpInstance.createChannel();  
         await connectToQueue(channel);
         return await consumeMessages(2, channel, (message) => {
-          console.log('get');
           checkMessage(JSON.parse(message.content));
         });
       })(),
@@ -100,7 +99,6 @@ describe('core/block processor', function () {
         const ws = new WebSocket('ws://localhost:15674/ws');
         const client = Stomp.over(ws, {heartbeat: false, debug: false});
         return await consumeStompMessages(2, client, (message) => {
-          console.log('get1');          
           checkMessage(JSON.parse(message.body));
         });
       })()
