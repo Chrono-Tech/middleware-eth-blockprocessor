@@ -11,6 +11,6 @@ module.exports = async(maxCount = 1, channel, parseMessage) => {
             } else {
                 messageCount++;
             }
-        });
+        }, {noAck: true});
   });
 }
