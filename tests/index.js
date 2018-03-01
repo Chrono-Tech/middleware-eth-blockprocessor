@@ -13,6 +13,8 @@ const awaitLastBlock = require('./helpers/awaitLastBlock'),
   saveAccountForAddress = require('./helpers/saveAccountForAddress'),
   connectToQueue = require('./helpers/connectToQueue'),
   clearQueues = require('./helpers/clearQueues'),
+  consumeMessages = require('./helpers/consumeMessages'),
+  consumeStompMessages = require('./helpers/consumeStompMessages'),
   net = require('net'),
   WebSocket = require('ws'),
   Web3 = require('web3'),
@@ -81,6 +83,9 @@ describe('core/block processor', function () {
     const channel = await amqpInstance.createChannel();  
     const queue = await connectToQueue(channel); 
 
+    const ws = new WebSocket('ws://localhost:15674/ws');
+    const client = Stomp.over(ws, {heartbeat: false, debug: false});
+
     const hash = await Promise.promisify(web3.eth.sendTransaction)({
       from: accounts[0],
       to: accounts[1],
@@ -90,28 +95,14 @@ describe('core/block processor', function () {
 
     return await Promise.all([
       (async () => {
-
-        return await new Promise(res  => {
-          let messageCount = 1;
-          channel.consume(`app_${config.rabbit.serviceName}_test.transaction`, (message) => {
-            checkMessage(JSON.parse(message.content));
-            messageCount === 2 ? res() : messageCount++;
-          })
+        return await consumeMessages(2, channel, (message) => {
+          checkMessage(JSON.parse(message.content));
         });
       })(),
       (async () => {
-        let ws = new WebSocket('ws://localhost:15674/ws');
-        let client = Stomp.over(ws, {heartbeat: false, debug: false});
-
-        return await new Promise(res =>
-          client.connect('guest', 'guest', async () => {
-            let messageCount = 1;
-            client.subscribe( `/exchange/events/${config.rabbit.serviceName}_transaction.*`, (message) => {
-              checkMessage(JSON.parse(message.body));
-              messageCount === 2 ? res() : messageCount++;
-            })
-          })
-        );
+        return await consumeStompMessages(2, client, (message) => {
+          checkMessage(JSON.parse(message.body));
+        });
       })()
     ]);
   });
