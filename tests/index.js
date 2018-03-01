@@ -36,7 +36,7 @@ describe('core/block processor', function () {
     accounts = await Promise.promisify(web3.eth.getAccounts)();
     await saveAccountForAddress(accounts[0]);
     await clearQueues(amqpInstance);
-    //return await awaitLastBlock(web3);
+    return await awaitLastBlock(web3);
   });
 
   after(async () => {
@@ -80,27 +80,27 @@ describe('core/block processor', function () {
       expect(content.nonce).to.be.a('number');
     };
 
-    const channel = await amqpInstance.createChannel();  
-    const queue = await connectToQueue(channel); 
-
-    const ws = new WebSocket('ws://localhost:15674/ws');
-    const client = Stomp.over(ws, {heartbeat: false, debug: false});
-
-    const hash = await Promise.promisify(web3.eth.sendTransaction)({
-      from: accounts[0],
-      to: accounts[1],
-      value: 100
-    });
- 
-
     return await Promise.all([
+      (async() => {
+        await Promise.promisify(web3.eth.sendTransaction)({
+          from: accounts[0],
+          to: accounts[1],
+          value: 100
+        });
+      })(),
       (async () => {
+        const channel = await amqpInstance.createChannel();  
+        await connectToQueue(channel);
         return await consumeMessages(2, channel, (message) => {
+          console.log('get');
           checkMessage(JSON.parse(message.content));
         });
       })(),
       (async () => {
+        const ws = new WebSocket('ws://localhost:15674/ws');
+        const client = Stomp.over(ws, {heartbeat: false, debug: false});
         return await consumeStompMessages(2, client, (message) => {
+          console.log('get1');          
           checkMessage(JSON.parse(message.body));
         });
       })()
@@ -109,18 +109,18 @@ describe('core/block processor', function () {
 
 
   it('send some  eth from nonregistered user to non registered user and has not notifications', async () => {
-    const channel = await amqpInstance.createChannel();  
-    await connectToQueue(channel); 
+
 
     await Promise.promisify(web3.eth.sendTransaction)({
       from: accounts[1],
       to: accounts[2],
       value: 100
     });
-
-    const queue =  await channel.assertQueue(`app_${config.rabbit.serviceName}_test.transaction`);
-    expect(queue.messageCount).to.equal(0);
+    Promise.delay(1000, async() => {
+      const channel = await amqpInstance.createChannel();  
+      const queue =await connectToQueue(channel); 
+      expect(queue.messageCount).to.equal(0);
+    });
   });
-
 
 });
