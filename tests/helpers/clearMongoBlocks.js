@@ -4,5 +4,5 @@ const accountModel = require('../../models/accountModel'),
 
 module.exports =  async function () {
     await accountModel.remove()
-    await blockModel.find({hash: {$exists: false}}).remove()
+    await blockModel.remove()
 };

@@ -95,16 +95,17 @@ class BlockCacheService {
       return;
 
     const block = await Promise.promisify(this.web3.eth.getBlock)('pending', true);
-    let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || {
+    let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || new blockModel({
         number: -1,
         hash: null,
         timestamp: 0,
         txs: []
-      };
+      });
 
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
-
-    await blockModel.findOneAndUpdate({number: -1}, currentUnconfirmedBlock, {upsert: true});
+    await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']), 
+      {upsert: true})
+      .catch(console.error);
   }
 
   async stopSync () {
