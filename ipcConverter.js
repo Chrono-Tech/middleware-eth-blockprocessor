@@ -32,15 +32,22 @@ console.log(addresses);
 // create RPC server
 const server = net.createServer(stream => {
   stream.on('data', c => {
-    try {
-      let payload = JSON.parse(c.toString());
-      RPCServer.provider.sendAsync(payload, (err, data) => {
-        stream.cork();
-        stream.write(JSON.stringify(err || data));
-        process.nextTick(() => stream.uncork());
+    let stringMsg;
+    try { 
+      stringMsg = c.toString()
+      .replace(/}\[{/g, '}{')
+      .replace(/}\]{/g, '}{')
+      .replace(/}\]\[{/g, '}{')
+      .replace(/}{/g, '},{');
+      JSON.parse('[' + stringMsg + ']').forEach((string) => {
+        RPCServer.provider.sendAsync(string, (err, data) => {
+          stream.cork();
+          stream.write(JSON.stringify(err || data));
+          process.nextTick(() => stream.uncork());
+        });
       });
-
     } catch (e) {
+      log.error(stringMsg);
       log.error(e);
       stream.write(JSON.stringify({
         message: e,
