@@ -66,8 +66,8 @@ class BlockCacheService {
         this.events.emit('block', block);
       } catch (err) {
 
-        if (err instanceof Promise.TimeoutError)
-          return;
+         if (err instanceof Promise.TimeoutError)
+           continue;
 
         if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString())
           return process.exit(-1);
@@ -95,16 +95,17 @@ class BlockCacheService {
       return;
 
     const block = await Promise.promisify(this.web3.eth.getBlock)('pending', true);
-    let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || {
+    let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || new blockModel({
         number: -1,
         hash: null,
         timestamp: 0,
         txs: []
-      };
+      });
 
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
-
-    await blockModel.findOneAndUpdate({number: -1}, currentUnconfirmedBlock, {upsert: true});
+    await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']), 
+      {upsert: true})
+      .catch(console.error);
   }
 
   async stopSync () {
@@ -114,13 +115,13 @@ class BlockCacheService {
 
   async processBlock () {
 
-    let block = await Promise.promisify(this.web3.eth.getBlockNumber)();
+    let block = await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(60000);
 
     if (block === this.currentHeight) //heads are equal
       return Promise.reject({code: 0});
 
     if (block === 0) {
-      let syncState = await Promise.promisify(this.web3.eth.getSyncing)();
+      let syncState = await Promise.promisify(this.web3.eth.getSyncing)().timeout(60000);
       if (syncState.currentBlock !== 0)
         return Promise.reject({code: 0});
     }
@@ -128,7 +129,7 @@ class BlockCacheService {
     if (block < this.currentHeight)
       return Promise.reject({code: 1}); //head has been blown off
 
-    const lastBlockHashes = await Promise.mapSeries(this.lastBlocks, async blockHash => await Promise.promisify(this.web3.eth.getBlock)(blockHash, false));
+    const lastBlockHashes = await Promise.mapSeries(this.lastBlocks, async blockHash => await Promise.promisify(this.web3.eth.getBlock)(blockHash, false).timeout(60000));
 
     if (_.compact(lastBlockHashes).length !== this.lastBlocks.length)
       return Promise.reject({code: 1}); //head has been blown off
@@ -137,10 +138,10 @@ class BlockCacheService {
      * Get raw block
      * @type {Object}
      */
-    let rawBlock = await Promise.promisify(this.web3.eth.getBlock)(this.currentHeight, true);
+    let rawBlock = await Promise.promisify(this.web3.eth.getBlock)(this.currentHeight, true).timeout(60000);
 
     let txsReceipts = await Promise.map(rawBlock.transactions, tx =>
-      Promise.promisify(this.web3.eth.getTransactionReceipt)(tx.hash), {concurrency: 1});
+      Promise.promisify(this.web3.eth.getTransactionReceipt)(tx.hash), {concurrency: 1}).timeout(60000);
 
     rawBlock.transactions = rawBlock.transactions.map(tx => {
       tx.logs = _.chain(txsReceipts)
