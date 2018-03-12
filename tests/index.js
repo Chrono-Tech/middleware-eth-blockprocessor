@@ -9,63 +9,79 @@ mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri);
 mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
 
 const awaitLastBlock = require('./helpers/awaitLastBlock'),
+  clearMongoBlocks = require('./helpers/clearMongoBlocks'),
+  saveAccountForAddress = require('./helpers/saveAccountForAddress'),
+  connectToQueue = require('./helpers/connectToQueue'),
+  clearQueues = require('./helpers/clearQueues'),
+  consumeMessages = require('./helpers/consumeMessages'),
+  consumeStompMessages = require('./helpers/consumeStompMessages'),
   net = require('net'),
   WebSocket = require('ws'),
-  path = require('path'),
   Web3 = require('web3'),
   web3 = new Web3(),
   expect = require('chai').expect,
-  accountModel = require('../models/accountModel'),
   amqp = require('amqplib'),
-  Stomp = require('webstomp-client'),
-  ctx = {};
+  Stomp = require('webstomp-client');
+
+let accounts, amqpInstance;
 
 describe('core/block processor', function () {
 
   before(async () => {
+    await clearMongoBlocks();
+    amqpInstance = await amqp.connect(config.rabbit.url);
     let provider = new Web3.providers.IpcProvider(config.web3.uri, net);
     web3.setProvider(provider);
 
+    accounts = await Promise.promisify(web3.eth.getAccounts)();
+    await saveAccountForAddress(accounts[0]);
+    await clearQueues(amqpInstance);
     return await awaitLastBlock(web3);
   });
 
-  after(() => {
+  after(async () => {
+    await clearMongoBlocks();
     web3.currentProvider.connection.end();
     return mongoose.disconnect();
   });
 
-  it('add account to mongo', async () => {
-    let accounts = await Promise.promisify(web3.eth.getAccounts)();
-    try {
-      await new accountModel({address: accounts[0]}).save();
-    } catch (e) {}
+  afterEach(async () => {
+      await clearQueues(amqpInstance);
   });
 
   it('send some eth from 0 account to account 1', async () => {
-    let accounts = await Promise.promisify(web3.eth.getAccounts)();
-    ctx.hash = await Promise.promisify(web3.eth.sendTransaction)({
+    const hash = await Promise.promisify(web3.eth.sendTransaction)({
       from: accounts[0],
       to: accounts[1],
       value: 100
     });
-
-    expect(ctx.hash).to.be.string;
+    expect(hash).to.be.string;
+    expect(hash).to.be.not.undefined;
   });
 
-  it('send some eth again and validate notification via amqp', async () => {
+  it('send some eth from account0 to account1 and validate countMessages(2) and structure message', async () => {
 
-    let amqpInstance = await amqp.connect(config.rabbit.url);
-    let channel = await amqpInstance.createChannel();
-
-    try {
-      await channel.assertExchange('events', 'topic', {durable: false});
-    } catch (e) {
-      channel = await amqpInstance.createChannel();
-    }
+    const checkMessage = function (content) {
+      expect(content).to.contain.all.keys(
+        'hash',
+        'nonce',
+        'blockNumber',
+        'from',
+        'to',
+        'value',
+        'gas',
+        'gasPrice',
+        'input',
+        'logs'
+      );
+      expect(content.value).to.equal('100');
+      expect(content.from).to.equal(accounts[0]);
+      expect(content.to).to.equal(accounts[1]);
+      expect(content.nonce).to.be.a('number');
+    };
 
     return await Promise.all([
-      (async () => {
-        let accounts = await Promise.promisify(web3.eth.getAccounts)();
+      (async() => {
         await Promise.promisify(web3.eth.sendTransaction)({
           from: accounts[0],
           to: accounts[1],
@@ -73,28 +89,36 @@ describe('core/block processor', function () {
         });
       })(),
       (async () => {
-
-        try {
-          await channel.assertQueue(`app_${config.rabbit.serviceName}_test.transaction`);
-          await channel.bindQueue(`app_${config.rabbit.serviceName}_test.transaction`, 'events', `${config.rabbit.serviceName}_transaction.*`);
-        } catch (e) {
-          channel = await amqpInstance.createChannel();
-        }
-
-        return await new Promise(res => {
-          channel.consume(`app_${config.rabbit.serviceName}_test.transaction`, res, {noAck: true})
-        })
+        const channel = await amqpInstance.createChannel();  
+        await connectToQueue(channel);
+        return await consumeMessages(2, channel, (message) => {
+          checkMessage(JSON.parse(message.content));
+        });
       })(),
       (async () => {
-        let ws = new WebSocket('ws://localhost:15674/ws');
-        let client = Stomp.over(ws, {heartbeat: false, debug: false});
-        return await new Promise(res =>
-          client.connect('guest', 'guest', () => {
-            client.subscribe(`/exchange/events/${config.rabbit.serviceName}_transaction.*`, res)
-          })
-        );
+        const ws = new WebSocket('ws://localhost:15674/ws');
+        const client = Stomp.over(ws, {heartbeat: false, debug: false});
+        return await consumeStompMessages(2, client, (message) => {
+          checkMessage(JSON.parse(message.body));
+        });
       })()
     ]);
+  });
+
+
+  it('send some  eth from nonregistered user to non registered user and has not notifications', async () => {
+
+
+    await Promise.promisify(web3.eth.sendTransaction)({
+      from: accounts[1],
+      to: accounts[2],
+      value: 100
+    });
+    Promise.delay(1000, async() => {
+      const channel = await amqpInstance.createChannel();  
+      const queue =await connectToQueue(channel); 
+      expect(queue.messageCount).to.equal(0);
+    });
   });
 
 });
