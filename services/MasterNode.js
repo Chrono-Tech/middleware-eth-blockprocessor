@@ -1,4 +1,5 @@
-const   amqp = require('amqplib'),
+const amqp = require('amqplib'),
+    config = require('../config'),
     Promise = require('bluebird');
 const uniqid = require('uniqid');
 
@@ -37,7 +38,12 @@ class MasterNode {
      * @memberOf MasterNode
      */
     constructor(_channel, logFunction = () => {}) {
-        const myid = uniqid();
+        const myid = uniqid(),
+            findMasterQueue = `${config.rabbit.serviceName}_findMaster_${myid}`,
+            findMasterRoute = `${config.rabbit.serviceName}_findMaster`,
+            setMasterQueue = `${config.rabbit.serviceName}_setMaster_${myid}`,
+            setMasterRoute = `${config.rabbit.serviceName}_setMaster`;
+
         
         this.channel = _channel;
         this._isMaster = false;
@@ -51,7 +57,7 @@ class MasterNode {
 
 
         const sendFindMasterEvent= async() => {
-            await this.channel.publish('master_events', 'findMaster', new Buffer(myid));
+            await this.channel.publish('master_events', findMasterRoute, new Buffer(myid));
         }
 
         this._isPrevSyncFreeze = () => {
@@ -64,23 +70,23 @@ class MasterNode {
         };
     
         this._sendSetMasterEvent = async() => {
-            await this.channel.publish(`master_events`, 'setMaster', new Buffer(myid));
+            await this.channel.publish(`master_events`, setMasterRoute, new Buffer(myid));
         };
         this._onFindMasterEvent = async (handler) => {
-            await this.channel.assertQueue(`findMaster${myid}`);
-            await this.channel.bindQueue(`findMaster${myid}`, EXCHANGE_NAME, `findMaster`, {autoDelete: true});
+            await this.channel.assertQueue(findMasterQueue);
+            await this.channel.bindQueue(findMasterQueue, EXCHANGE_NAME, findMasterRoute, {autoDelete: true});
         
-            this.channel.consume(`findMaster${myid}`, async (message) => {
+            this.channel.consume(findMasterQueue, async (message) => {
             await handler(message.content.toString());
                 this.channel.ack(message);    
             });
         };
 
         this._onSetMasterEvent = async (handler) => {
-            await this.channel.assertQueue(`setMaster${myid}`);
-            await this.channel.bindQueue(`setMaster${myid}`, EXCHANGE_NAME, `setMaster`, {autoDelete: true});
+            await this.channel.assertQueue(setMasterQueue);
+            await this.channel.bindQueue(setMasterQueue, EXCHANGE_NAME, setMasterRoute, {autoDelete: true});
         
-            this.channel.consume(`setMaster${myid}`, async(message) => {
+            this.channel.consume(setMasterQueue, async(message) => {
                 handler(message.content.toString());
                 this.channel.ack(message);
             });
