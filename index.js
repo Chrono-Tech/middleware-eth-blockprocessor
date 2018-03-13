@@ -1,9 +1,6 @@
 /**
  * Middleware service for handling emitted events on chronobank platform
  * @module Chronobank/eth-blockprocessor
- * @requires config
- * @requires models/blockModel
- * @requires services/blockProcessService
  */
 
 const mongoose = require('mongoose'),
@@ -14,16 +11,14 @@ mongoose.Promise = Promise;
 mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
 mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri, {useMongoClient: true});
 
-const blockModel = require('./models/blockModel'),
-  _ = require('lodash'),
+const _ = require('lodash'),
+  BlockCacheService = require('./services/blockCacheService'),
   bunyan = require('bunyan'),
   Web3 = require('web3'),
-  web3Errors = require('web3/lib/web3/errors'),
   net = require('net'),
   amqp = require('amqplib'),
   log = bunyan.createLogger({name: 'app'}),
-  filterTxsByAccountService = require('./services/filterTxsByAccountService'),
-  blockProcessService = require('./services/blockProcessService');
+  filterTxsByAccountService = require('./services/filterTxsByAccountService');
 
 [mongoose.accounts, mongoose.connection].forEach(connection =>
   connection.on('disconnected', function () {
@@ -34,111 +29,75 @@ const blockModel = require('./models/blockModel'),
 
 const init = async () => {
 
-    let currentBlock = await blockModel.findOne({network: config.web3.network}).sort('-block');
-    currentBlock = _.chain(currentBlock).get('block', 0).add(0).value();
-    log.info(`search from block:${currentBlock} for network:${config.web3.network}`);
+  const provider = new Web3.providers.IpcProvider(config.web3.uri, net);
+  const web3 = new Web3();
+  web3.setProvider(provider);
+  const blockCacheService = new BlockCacheService(web3);
 
-    let provider = new Web3.providers.IpcProvider(config.web3.uri, net);
-    const web3 = new Web3();
-    web3.setProvider(provider);
+  web3.currentProvider.connection.on('end', () => {
+    log.error('ipc process has finished!');
+    process.exit(0);
+  });
 
-    web3.currentProvider.connection.on('end', () => {
-      log.error('ipc process has finished!');
-      process.exit(0);
-    });
-
-    let amqpInstance = await amqp.connect(config.rabbit.url)
-      .catch(() => {
-        log.error('rabbitmq process has finished!');
-        process.exit(0);
-      });
-
-    let channel = await amqpInstance.createChannel();
-
-    channel.on('close', () => {
+  let amqpInstance = await amqp.connect(config.rabbit.url)
+    .catch(() => {
       log.error('rabbitmq process has finished!');
       process.exit(0);
     });
 
-    await channel.assertExchange('events', 'topic', {durable: false});
+  let channel = await amqpInstance.createChannel();
 
-    web3.eth.filter('pending').watch(async (err, result) => {
-      if (err)
-        return;
+  channel.on('close', () => {
+    log.error('rabbitmq process has finished!');
+    process.exit(0);
+  });
 
-      let tx = await Promise.promisify(web3.eth.getTransaction)(result);
+  await channel.assertExchange('events', 'topic', {durable: false});
 
-      if (!_.has(tx, 'hash'))
-        return;
+  blockCacheService.events.on('block', async block => {
+    log.info('%s (%d) added to cache.', block.hash, block.number);
+    const filteredTxs = await filterTxsByAccountService(block.transactions);
 
-      let receipt = Promise.promisify(web3.eth.getTransactionReceipt)(tx.hash);
-      tx.logs = _.get(receipt, 'logs', []);
+    for (let tx of filteredTxs) {
+      let addresses = _.chain([tx.to, tx.from])
+        .union(tx.logs.map(log => log.address))
+        .uniq()
+        .value();
 
-      let filteredTxs = await filterTxsByAccountService([tx]);
+      for (let address of addresses)
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
+    }
+  });
 
-      for (let filteredTx of filteredTxs) {
+  await blockCacheService.startSync();
 
-        let addresses = _.chain([filteredTx.to, filteredTx.from])
-          .union(filteredTx.logs.map(log => log.address))
-          .uniq()
-          .value();
+  web3.eth.filter('pending').watch(async (err, result) => {
 
-        filteredTx = _.omit(filteredTx, ['blockHash', 'transactionIndex']);
-        filteredTx.blockNumber = -1;
-        for (let address of addresses)
-          await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(filteredTx)));
-      }
+    if (err || !await blockCacheService.isSynced())
+      return;
 
-    });
+    let tx = await Promise.promisify(web3.eth.getTransaction)(result);
 
-    /**
-     * Recursive routine for processing incoming blocks.
-     * @return {undefined}
-     */
-    let processBlock = async () => {
-      try {
-        let filteredTxs = await Promise.resolve(blockProcessService(currentBlock, web3)).timeout(20000);
+    tx.logs = [];
+    if (!_.has(tx, 'hash'))
+      return;
 
-        for (let tx of filteredTxs) {
-          let addresses = _.chain([tx.to, tx.from])
-            .union(tx.logs.map(log => log.address))
-            .uniq()
-            .value();
+    const data = await filterTxsByAccountService([tx]);
 
-          for (let address of addresses)
-            await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
-        }
+    for (let filteredTx of data) {
 
-        await blockModel.findOneAndUpdate({network: config.web3.network}, {
-          $set: {
-            block: currentBlock,
-            created: Date.now()
-          }
-        }, {upsert: true});
+      let addresses = _.chain([filteredTx.to, filteredTx.from])
+        .uniq()
+        .value();
 
-        currentBlock++;
-        processBlock();
-      } catch (err) {
+      filteredTx = _.omit(filteredTx, ['blockHash', 'transactionIndex']);
+      filteredTx.blockNumber = -1;
+      for (let address of addresses)
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(filteredTx)));
+    }
 
-        if (err instanceof Promise.TimeoutError)
-          return processBlock();
+  });
 
-        if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString())
-          return process.exit(-1);
-
-        if (_.get(err, 'code') === 0) {
-          log.info(`await for next block ${currentBlock}`);
-          return setTimeout(processBlock, 10000);
-        }
-
-        currentBlock++;
-        processBlock();
-      }
-    };
-
-    processBlock();
-
-  }
-;
+};
 
 module.exports = init();

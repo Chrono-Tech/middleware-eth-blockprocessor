@@ -1,13 +1,16 @@
 /**
  * Transaction filter
  * @module services/filterTxsByAccount
- * @requires models/accountModel
  */
 
 const _ = require('lodash'),
   accountModel = require('../models/accountModel');
 
 module.exports = async (txs) => {
+
+  if (!txs.length)
+    return [];
+
   let query = {
     isActive: {$ne: false},
     $or: [
