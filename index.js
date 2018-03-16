@@ -69,14 +69,9 @@ const init = async () => {
     }
   });
 
-  await blockCacheService.startSync();
 
-  web3.eth.filter('pending').watch(async (err, result) => {
-
-    if (err || !await blockCacheService.isSynced())
-      return;
-
-    let tx = await Promise.promisify(web3.eth.getTransaction)(result);
+  blockCacheService.events.on('pending', async (txHash) => {
+    let tx = await Promise.promisify(web3.eth.getTransaction)(txHash);
 
     tx.logs = [];
     if (!_.has(tx, 'hash'))
@@ -95,8 +90,9 @@ const init = async () => {
       for (let address of addresses)
         await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(filteredTx)));
     }
-
   });
+
+  blockCacheService.startSync();
 
 };
 

@@ -46,7 +46,7 @@ class BlockCacheService {
   }
 
   async doJob () {
-    while (this.isSyncing) {
+    while (this.isSyncing) 
       try {
         let block = await this.processBlock();
         await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
@@ -66,8 +66,8 @@ class BlockCacheService {
         this.events.emit('block', block);
       } catch (err) {
 
-         if (err instanceof Promise.TimeoutError)
-           continue;
+        if (err instanceof Promise.TimeoutError)
+          continue;
 
         if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString())
           return process.exit(-1);
@@ -86,26 +86,26 @@ class BlockCacheService {
           this.currentHeight = lastCheckpointBlock - 1;
         }
       }
-    }
+    
   }
 
-  async UnconfirmedTxEvent (err) {
+  async UnconfirmedTxEvent (err, txHash) {
 
     if (err)
       return;
 
     const block = await Promise.promisify(this.web3.eth.getBlock)('pending', true);
     let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || new blockModel({
-        number: -1,
-        hash: null,
-        timestamp: 0,
-        txs: []
-      });
+      number: -1,
+      hash: null,
+      timestamp: 0,
+      txs: []
+    });
 
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
     await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']), 
-      {upsert: true})
-      .catch(console.error);
+      {upsert: true});
+    this.events.emit('pending', txHash);
   }
 
   async stopSync () {
