@@ -2,8 +2,7 @@ require('dotenv/config');
 
 const config = require('./config'),
   Promise = require('bluebird'),
-  mongoose = require('mongoose'),
-  { spawn } = require('child_process');
+  mongoose = require('mongoose');
 
 mongoose.Promise = Promise;
 mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri);
@@ -12,6 +11,7 @@ mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
 const Web3Service = require('../services/Web3Service'),
   BlockCacheService = require('../services/blockCacheService'),
   net = require('net'),
+  runTestRpc = require('./helpers/runTestRpc'),
   WebSocket = require('ws'),
   Web3 = require('web3'),
   web3 = new Web3(),
@@ -24,12 +24,8 @@ let amqpInstance, ipc;
 describe('core/block processor - switch providers', function () {
 
     beforeEach(async () => {
-        ipc = spawn(
-            'node',
-            [__dirname + '/../ipcConverter.js'],
-            {'env': {'PORT': '8546'}}
-        );
-        await Promise.delay(5000);
+        ipc = runTestRpc();
+        await Promise.delay(10000);
     });
 
     afterEach(async () => {
@@ -114,11 +110,7 @@ describe('core/block processor - switch providers', function () {
             await Promise.delay(3000);
             web3Service.getBlockNumber();
 
-            ipc = spawn(
-                'node',
-                [__dirname + '/../ipcConverter.js'],
-                {'env': {'PORT': '8546'}}
-            );
+            ipc = runTestRpc();
             await Promise.delay(5000);
             web3Service.getBlockNumber();
         })()
