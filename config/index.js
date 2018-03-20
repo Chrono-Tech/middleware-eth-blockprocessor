@@ -5,6 +5,7 @@
  */
 
 require('dotenv').config();
+const parseEnvProviders = require('../utils').parseEnvProviders;
 
 const config = {
   mongo: {
@@ -25,9 +26,11 @@ const config = {
     serviceName: process.env.RABBIT_SERVICE_NAME || 'app_eth'
   },
   web3: {
-    network: process.env.NETWORK || 'development',
-    uri: `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${process.env.WEB3_URI || `/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
-  }
+    providers: parseEnvProviders(process.env.PROVIDERS) || [
+      `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
+    ],
+    network: process.env.NETWORK || 'development'
+  },
 };
 
 module.exports = config;

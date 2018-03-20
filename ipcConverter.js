@@ -5,7 +5,7 @@
  */
 
 const net = require('net'),
-  config = require('./config'),
+  config = require('./tests/config'),
   bunyan = require('bunyan'),
   fs = require('fs'),
   path = require('path'),
@@ -14,9 +14,9 @@ const net = require('net'),
   TestRPC = require('ethereumjs-testrpc');
 
 let RPCServer = TestRPC.server();
-RPCServer.listen(8545);
+RPCServer.listen(process.env.PORT || 8545);
 
-let addresses = _.chain(RPCServer.provider.manager.state.accounts)
+_.chain(RPCServer.provider.manager.state.accounts)
   .toPairs()
   .map(pair=> {
     pair[1] = Buffer.from(pair[1].secretKey, 'hex').toString('hex');
@@ -25,7 +25,6 @@ let addresses = _.chain(RPCServer.provider.manager.state.accounts)
   .fromPairs()
   .value();
 
-console.log(addresses);
 
 
 
@@ -35,10 +34,10 @@ const server = net.createServer(stream => {
     let stringMsg;
     try { 
       stringMsg = c.toString()
-      .replace(/}\[{/g, '}{')
-      .replace(/}\]{/g, '}{')
-      .replace(/}\]\[{/g, '}{')
-      .replace(/}{/g, '},{');
+        .replace(/}\[{/g, '}{')
+        .replace(/}\]{/g, '}{')
+        .replace(/}\]\[{/g, '}{')
+        .replace(/}{/g, '},{');
       JSON.parse('[' + stringMsg + ']').forEach((string) => {
         RPCServer.provider.sendAsync(string, (err, data) => {
           stream.cork();
@@ -58,8 +57,8 @@ const server = net.createServer(stream => {
 })
   .on('error', err => {
   // If pipe file exists try to remove it & start server again
-    if(err.code === 'EADDRINUSE' && removePipeFile(config.web3.uri))
-      server.listen(config.web3.uri);
+    if(err.code === 'EADDRINUSE' && removePipeFile(config.dev.uri))
+      server.listen(config.dev.uri);
     else
       process.exit(1);
   });
@@ -81,7 +80,7 @@ const removePipeFile = filename => {
 
 // Create directory for Win32
 if (!/^win/.test(process.platform)) {
-  let pathIpc = path.parse(config.web3.uri).dir;
+  let pathIpc = path.parse(config.dev.uri).dir;
 
   if (!fs.existsSync(pathIpc))
     fs.mkdirSync(pathIpc);
@@ -105,12 +104,12 @@ if (process.platform === 'win32') {
 
 process.on('SIGINT', function () {
   try {
-    removePipeFile(config.web3.uri);
+    removePipeFile(config.dev.uri);
   } catch (e) {}
   process.exit();
 });
 
 //Going to start server 
-server.listen(config.web3.uri, () => {
+server.listen(config.dev.uri, () => {
   log.info(`Server: on listening for network - ${config.web3.network}`);
 });

@@ -1,8 +1,8 @@
-const config = require('../../config');
-module.exports = async(maxCount = 1, channel, parseMessage) => {
+const config = require('../config');
+module.exports = async(maxCount = 1, channel, parseMessage, queueName = `app_${config.rabbit.serviceName}_test.transaction`) => {
     return new Promise(res  => {
         let messageCount = 1;
-        channel.consume(`app_${config.rabbit.serviceName}_test.transaction`, async (message) => {
+        channel.consume(queueName, async (message) => {
             parseMessage(message);
 
             if (messageCount === maxCount) {

@@ -1,5 +1,5 @@
 const blockModel = require('../../models/blockModel'),
-  config = require('../../config'),
+  config = require('../config'),
   _ = require('lodash'),
   Promise = require('bluebird');
 

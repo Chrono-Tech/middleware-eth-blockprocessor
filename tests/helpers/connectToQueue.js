@@ -1,4 +1,4 @@
-const config = require('../../config');
+const config = require('../config');
 
 module.exports = async (channel) => {
     await channel.assertExchange('events', 'topic', {durable: false});
