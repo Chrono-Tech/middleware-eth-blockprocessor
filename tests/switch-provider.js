@@ -10,36 +10,31 @@ mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
 
 const Web3Service = require('../services/Web3Service'),
   BlockCacheService = require('../services/blockCacheService'),
-  net = require('net'),
-  runTestRpc = require('./helpers/runTestRpc'),
-  WebSocket = require('ws'),
-  Web3 = require('web3'),
-  web3 = new Web3(),
   expect = require('chai').expect,
-  amqp = require('amqplib'),
-  Stomp = require('webstomp-client');
+  TestServer = require('./scripts/TestServer');
 
-let amqpInstance, ipc;
+let server;
+
 
 describe('core/block processor - switch providers', function () {
 
     beforeEach(async () => {
-        ipc = runTestRpc();
-        await Promise.delay(10000);
+        server = new TestServer();
+        await Promise.delay(5000);
     });
 
     afterEach(async () => {
-        if (ipc)
-            ipc.kill();
+        if (server)
+            server.kill();
     });
 
 
   it('two providers -- 8546 and 8545, after kill one switch to second', async () => {
-
     const newUri = 'http://localhost:8546';
     const providers = [newUri, 'http://google.ru', config.dev.httpUri];
 
     const web3Service = new Web3Service(providers);
+    
     web3Service.events.on('end', () => {
       log.error('ipc process has finished!');
       process.exit(0);
@@ -48,16 +43,13 @@ describe('core/block processor - switch providers', function () {
     const blockNumber = await web3Service.getBlockNumber();
     expect(blockNumber).to.be.not.undefined;
 
-    ipc.kill();
-    await Promise.delay(3000);
+    await server.kill();
 
     const blockNumberTwo = await web3Service.getBlockNumber();
-    expect(blockNumber).to.be.not.undefined;
-
+    expect(blockNumberTwo).to.be.not.undefined;
   });
 
   it('one provider -- 8546, kill him and end with errorEnd', async () => {
-
     const newUri = 'http://localhost:8546';
     const providers = [newUri, 'http://google.ru'];
 
@@ -72,7 +64,7 @@ describe('core/block processor - switch providers', function () {
             });
         })(),
         (async() => {
-            ipc.kill();
+            server.kill();
             await Promise.delay(3000);
             web3Service.getBlockNumber();
         })()
@@ -105,13 +97,13 @@ describe('core/block processor - switch providers', function () {
             });
         })(),
         (async() => {
+            await Promise.delay(1000);
+            server.kill();            
             await Promise.delay(2000);
-            ipc.kill();
-            await Promise.delay(3000);
             web3Service.getBlockNumber();
 
-            ipc = runTestRpc();
-            await Promise.delay(5000);
+            server = new TestServer();
+            await Promise.delay(3000);
             web3Service.getBlockNumber();
         })()
     ]);

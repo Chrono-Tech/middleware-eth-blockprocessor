@@ -113,7 +113,7 @@ class BlockCacheService {
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
     await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']),
       {upsert: true})
-      .catch(console.error);
+      .catch(log.error);
     this.events.emit('pending', txHash);
   }
 

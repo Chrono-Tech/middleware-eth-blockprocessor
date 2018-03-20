@@ -31,11 +31,9 @@ await channel.bindQueue(`super${myid}`, 'super_events', `super_sender`, {autoDel
 
 channel.consume(`super${myid}`, async (message) => {
   if (!await masterNode.isSyncMaster()) {
-    console.log('not master processed');
     return;
   }
   
-  console.log(`Master node #${myid} processed message`);
   await channel.publish('super_events', `super_consumer`, new Buffer(myid));
   
   channel.ack(message);
