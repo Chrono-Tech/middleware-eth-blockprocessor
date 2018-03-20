@@ -44,7 +44,8 @@ class ProviderContext {
     
     this._onDisconnectProvider = () => {
       const currentProvider = this.providers[this.currentIndex];
-      currentProvider.lastError = Date.now();
+      if (currentProvider)
+        currentProvider.lastError = Date.now();
       this.syncProvider();
     };
     
@@ -147,13 +148,6 @@ class Web3Service {
   constructor (urls) {
     this.events = new EventEmitter();        
 
-    this._network = undefined;
-    this.events.on('provider_change', async () => {
-      this._network = await this._execute(async () => {
-        return await Promise.promisify(web3.version.getNetwork)();
-      });
-    });
-
     this._provider = new ProviderContext(urls, this.events);
     this._provider.syncProvider();
 
@@ -187,7 +181,7 @@ class Web3Service {
    * @memberOf Web3Service
    */
   getNetwork () {
-    return this._network === 1 ? 'mainnet': config.dev.web3.network;
+    return config.web3.network;
   }
 
   async _execute (command) {

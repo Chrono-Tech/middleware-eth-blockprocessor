@@ -1,6 +1,6 @@
 require('dotenv/config');
 
-const config = require('../config'),
+const config = require('./config'),
   Promise = require('bluebird'),
   mongoose = require('mongoose');
 
@@ -30,7 +30,7 @@ describe('core/block processor', function () {
   before(async () => {
     await clearMongoBlocks();
     amqpInstance = await amqp.connect(config.rabbit.url);
-    let provider = new Web3.providers.IpcProvider(config.dev.web3.uri, net);
+    let provider = new Web3.providers.IpcProvider(config.dev.uri, net);
     web3.setProvider(provider);
 
     accounts = await Promise.promisify(web3.eth.getAccounts)();

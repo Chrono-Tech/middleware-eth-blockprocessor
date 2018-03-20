@@ -1,4 +1,4 @@
-const config = require('../../config');
+const config = require('../config');
 module.exports = async(maxCount = 1, channel, parseMessage, queueName = `app_${config.rabbit.serviceName}_test.transaction`) => {
     return new Promise(res  => {
         let messageCount = 1;

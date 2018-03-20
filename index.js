@@ -28,7 +28,7 @@ const _ = require('lodash'),
 
 const init = async () => {
 
-  const web3Service = new Web3Service(config.providers);
+  const web3Service = new Web3Service(config.web3.providers);
   web3Service.events.on('end', () => {
     log.error('ipc process has finished!');
     process.exit(0);

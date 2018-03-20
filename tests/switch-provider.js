@@ -1,6 +1,6 @@
 require('dotenv/config');
 
-const config = require('../config'),
+const config = require('./config'),
   Promise = require('bluebird'),
   mongoose = require('mongoose'),
   { spawn } = require('child_process');
@@ -41,7 +41,7 @@ describe('core/block processor - switch providers', function () {
   it('two providers -- 8546 and 8545, after kill one switch to second', async () => {
 
     const newUri = 'http://localhost:8546';
-    const providers = [newUri, 'http://google.ru', config.dev.web3.httpUri];
+    const providers = [newUri, 'http://google.ru', config.dev.httpUri];
 
     const web3Service = new Web3Service(providers);
     web3Service.events.on('end', () => {
@@ -89,7 +89,7 @@ describe('core/block processor - switch providers', function () {
   it('two providers -- 8546 and 8545, after kill switch to second. than run first, and switch to first', async () => {
 
     const newUri = 'http://localhost:8546';
-    const providers = [newUri, 'http://google.ru', config.dev.web3.httpUri];
+    const providers = [newUri, 'http://google.ru', config.dev.httpUri];
 
     const web3Service = new Web3Service(providers);
     web3Service.events.on('end', () => {

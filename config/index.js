@@ -25,16 +25,12 @@ const config = {
     url: process.env.RABBIT_URI || 'amqp://localhost:5672',
     serviceName: process.env.RABBIT_SERVICE_NAME || 'app_eth'
   },
-  dev: {
-    web3: {
-      uri:  `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`,
-      httpUri: 'http://localhost:8545',
-      network: process.env.NETWORK || 'development'
-    }
+  web3: {
+    providers: parseEnvProviders(process.env.PROVIDERS) || [
+      `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
+    ],
+    network: process.env.NETWORK || 'development'
   },
-  providers: parseEnvProviders(process.env.PROVIDERS) || [
-    `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
-  ]
 };
 
 module.exports = config;

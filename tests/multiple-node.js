@@ -1,5 +1,5 @@
 const {spawn} = require('child_process'),
-    config = require('../config'),
+    config = require('./config'),
     Promise = require('bluebird'),
     consumeMessages = require('./helpers/consumeMessages'),
     expect = require('chai').expect,
