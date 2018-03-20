@@ -5,7 +5,7 @@
  */
 
 const net = require('net'),
-  config = require('./config'),
+  config = require('./config').dev,
   bunyan = require('bunyan'),
   fs = require('fs'),
   path = require('path'),
@@ -14,9 +14,9 @@ const net = require('net'),
   TestRPC = require('ethereumjs-testrpc');
 
 let RPCServer = TestRPC.server();
-RPCServer.listen(8545);
+RPCServer.listen(process.env.PORT || 8545);
 
-let addresses = _.chain(RPCServer.provider.manager.state.accounts)
+_.chain(RPCServer.provider.manager.state.accounts)
   .toPairs()
   .map(pair=> {
     pair[1] = Buffer.from(pair[1].secretKey, 'hex').toString('hex');
@@ -25,7 +25,6 @@ let addresses = _.chain(RPCServer.provider.manager.state.accounts)
   .fromPairs()
   .value();
 
-console.log(addresses);
 
 
 
@@ -35,10 +34,10 @@ const server = net.createServer(stream => {
     let stringMsg;
     try { 
       stringMsg = c.toString()
-      .replace(/}\[{/g, '}{')
-      .replace(/}\]{/g, '}{')
-      .replace(/}\]\[{/g, '}{')
-      .replace(/}{/g, '},{');
+        .replace(/}\[{/g, '}{')
+        .replace(/}\]{/g, '}{')
+        .replace(/}\]\[{/g, '}{')
+        .replace(/}{/g, '},{');
       JSON.parse('[' + stringMsg + ']').forEach((string) => {
         RPCServer.provider.sendAsync(string, (err, data) => {
           stream.cork();

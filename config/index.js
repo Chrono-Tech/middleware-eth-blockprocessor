@@ -5,6 +5,7 @@
  */
 
 require('dotenv').config();
+const parseEnvProviders = require('../utils').parseEnvProviders;
 
 const config = {
   mongo: {
@@ -24,10 +25,16 @@ const config = {
     url: process.env.RABBIT_URI || 'amqp://localhost:5672',
     serviceName: process.env.RABBIT_SERVICE_NAME || 'app_eth'
   },
-  web3: {
-    network: process.env.NETWORK || 'development',
-    uri: `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${process.env.WEB3_URI || `/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
-  }
+  dev: {
+    web3: {
+      uri:  `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`,
+      httpUri: 'http://localhost:8545',
+      network: process.env.NETWORK || 'development'
+    }
+  },
+  providers: parseEnvProviders(process.env.PROVIDERS) || [
+    `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
+  ]
 };
 
 module.exports = config;

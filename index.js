@@ -13,9 +13,8 @@ mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri, {useMon
 
 const _ = require('lodash'),
   BlockCacheService = require('./services/blockCacheService'),
+  Web3Service = require('./services/Web3Service'),
   bunyan = require('bunyan'),
-  Web3 = require('web3'),
-  net = require('net'),
   amqp = require('amqplib'),
   log = bunyan.createLogger({name: 'app'}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
@@ -29,15 +28,16 @@ const _ = require('lodash'),
 
 const init = async () => {
 
-  const provider = new Web3.providers.IpcProvider(config.web3.uri, net);
-  const web3 = new Web3();
-  web3.setProvider(provider);
-  const blockCacheService = new BlockCacheService(web3);
-
-  web3.currentProvider.connection.on('end', () => {
+  const web3Service = new Web3Service(config.providers);
+  web3Service.events.on('end', () => {
     log.error('ipc process has finished!');
     process.exit(0);
   });
+
+  
+  const blockCacheService = new BlockCacheService(web3Service);
+
+
 
   let amqpInstance = await amqp.connect(config.rabbit.url)
     .catch(() => {
@@ -71,7 +71,7 @@ const init = async () => {
 
 
   blockCacheService.events.on('pending', async (txHash) => {
-    let tx = await Promise.promisify(web3.eth.getTransaction)(txHash);
+    let tx = await web3Service.getTransaction(txHash);
 
     tx.logs = [];
     if (!_.has(tx, 'hash'))
