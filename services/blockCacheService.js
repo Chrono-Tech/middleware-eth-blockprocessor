@@ -37,7 +37,7 @@ class BlockCacheService {
       await blockModel.remove({number: -1});
 
     const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
-    this.currentHeight = _.chain(currentBlocks).get('0.number', -1).add(1).value();
+    this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
     this.doJob();
@@ -66,8 +66,8 @@ class BlockCacheService {
         this.events.emit('block', block);
       } catch (err) {
 
-         if (err instanceof Promise.TimeoutError)
-           continue;
+        if (err instanceof Promise.TimeoutError)
+          continue;
 
         if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString())
           return process.exit(-1);
@@ -103,7 +103,7 @@ class BlockCacheService {
       });
 
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
-    await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']), 
+    await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']),
       {upsert: true})
       .catch(console.error);
   }
@@ -138,7 +138,7 @@ class BlockCacheService {
      * Get raw block
      * @type {Object}
      */
-    let rawBlock = await Promise.promisify(this.web3.eth.getBlock)(this.currentHeight, true).timeout(60000);
+    let rawBlock = await Promise.promisify(this.web3.eth.getBlock)(this.currentHeight + 1, true).timeout(60000);
 
     let txsReceipts = await Promise.map(rawBlock.transactions, tx =>
       Promise.promisify(this.web3.eth.getTransactionReceipt)(tx.hash), {concurrency: 1}).timeout(60000);
