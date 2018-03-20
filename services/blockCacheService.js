@@ -44,7 +44,7 @@ class BlockCacheService {
       await blockModel.remove({number: -1});
 
     const currentBlocks = await blockModel.find({network: this.web3Service.getNetwork()}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
-    this.currentHeight = _.chain(currentBlocks).get('0.number', -1).add(1).value();
+    this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
     log.info(`caching from block:${this.currentHeight} for network:${this.web3Service.getNetwork()}`);
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
     await this.doJob();
@@ -111,8 +111,9 @@ class BlockCacheService {
     });
 
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
-    await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']), 
-      {upsert: true});
+    await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']),
+      {upsert: true})
+      .catch(console.error);
     this.events.emit('pending', txHash);
   }
 
@@ -147,7 +148,7 @@ class BlockCacheService {
      * Get raw block
      * @type {Object}
      */
-    let rawBlock = await this.web3Service.getBlock(this.currentHeight, true);
+    let rawBlock = await this.web3Service.getBlock(this.currentHeight + 1, true);
 
     let txsReceipts = await this.web3Service.getTransactionReceipts(rawBlock.transactions);
 
