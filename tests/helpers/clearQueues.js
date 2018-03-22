@@ -1,4 +1,4 @@
-const config = require('../../config');
+const config = require('../config');
 
 module.exports = async (amqpInstance) => {
     const channel = await amqpInstance.createChannel();

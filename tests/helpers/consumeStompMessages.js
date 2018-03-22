@@ -1,4 +1,4 @@
-const config = require('../../config');
+const config = require('../config');
 module.exports = async(maxCount = 1, client, parseMessage) => {
     return new Promise(res  => client.connect('guest', 'guest', () => {
         let messageCount = 1;
