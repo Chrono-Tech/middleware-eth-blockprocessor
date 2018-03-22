@@ -140,13 +140,17 @@ class BlockCacheService {
      */
     let rawBlock = await Promise.promisify(this.web3.eth.getBlock)(this.currentHeight + 1, true).timeout(60000);
 
-    let txsReceipts = await Promise.map(rawBlock.transactions, tx =>
-      Promise.promisify(this.web3.eth.getTransactionReceipt)(tx.hash), {concurrency: 1}).timeout(60000);
+    let logs = await new Promise((res, rej) =>
+      this.web3.eth.filter({fromBlock: this.currentHeight + 1, toBlock: this.currentHeight + 1})
+        .get((err, result) => err ? rej(err) : res(result))
+    ).timeout(60000);
+
+
 
     rawBlock.transactions = rawBlock.transactions.map(tx => {
-      tx.logs = _.chain(txsReceipts)
-        .find({transactionHash: tx.hash})
-        .get('logs', [])
+      tx.logs = _.chain(logs)
+        .filter({transactionHash: tx.hash})
+        .map(item=>_.omit(item, ['transactionHash', 'transactionIndex', 'blockHash', 'blockNumber']))
         .value();
       return tx;
     });
