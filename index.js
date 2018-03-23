@@ -70,26 +70,25 @@ const init = async () => {
 
   await channel.assertExchange('events', 'topic', {durable: false});
 
-  /*  const syncCacheService = new SyncCacheService(web3s);
+  const syncCacheService = new SyncCacheService(web3s);
 
-   syncCacheService.events.on('block', async block => {
-   log.info('%s (%d) added to cache.', block.hash, block.number);
-   const filteredTxs = await filterTxsByAccountService(block.transactions);
+  syncCacheService.events.on('block', async block => {
+    log.info('%s (%d) added to cache.', block.hash, block.number);
+    const filteredTxs = await filterTxsByAccountService(block.transactions);
 
-   for (let tx of filteredTxs) {
-   let addresses = _.chain([tx.to, tx.from])
-   .union(tx.logs.map(log => log.address))
-   .uniq()
-   .value();
+    for (let tx of filteredTxs) {
+      let addresses = _.chain([tx.to, tx.from])
+        .union(tx.logs.map(log => log.address))
+        .uniq()
+        .value();
 
-   for (let address of addresses)
-   await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
-   }
-   });
+      for (let address of addresses)
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
+    }
+  });
 
-
-   await syncCacheService.start();
-   process.exit(0);*/
+  await syncCacheService.start();
+  log.info('cached the whole blockchain!');
 
   let blockEventCallback = async block => {
     log.info('%s (%d) added to cache.', block.hash, block.number);
@@ -123,7 +122,6 @@ const init = async () => {
 
   };
 
-
   const runCacheService = async () => {
 
     let blockWatchingService = new BlockWatchingService(web3s);
@@ -136,12 +134,7 @@ const init = async () => {
     blockWatchingService.events.on('error', runCacheService);
   };
 
-
   runCacheService();
-
-
-
-
 
 };
 

@@ -53,7 +53,7 @@ class BlockWatchingService {
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
     this.doJob();
     this.pendingFilter = this.web3.eth.filter('pending');
-    this.pendingFilter.watch(this.UnconfirmedTxEvent)
+    this.pendingFilter.watch((err, result) => this.UnconfirmedTxEvent(err, result))
 
   }
 

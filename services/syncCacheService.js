@@ -38,7 +38,10 @@ class SyncCacheService {
           });
         }
 
+        this.isSyncing = false;
+
       } catch (e) {
+        console.log(e)
         if (_.get(e, 'code') === 0) {
           log.info('nodes are down or not synced!');
           process.exit(0);
@@ -50,26 +53,31 @@ class SyncCacheService {
   async runPeer (web3, buckets, locker, index) {
 
     while (buckets.length) {
-      let lockerChunks = _.keys(locker);
-      let newChunkToLock = _.chain(buckets).reject(item => _.find(lockerChunks, lock => _.isEqualWith(lock, item))).head().value();
-      if (newChunkToLock) {
-        locker[web3.index] = newChunkToLock;
+      let lockerChunks = _.values(locker);
+      let newChunkToLock = _.chain(buckets).reject(item =>
+        _.find(lockerChunks, lock => lock[0] === item[0])
+      ).head().value();
 
-        await Promise.mapSeries(buckets[index], async (blockNumber) => {
+      if (newChunkToLock) {
+        locker[index] = newChunkToLock;
+        await Promise.mapSeries(newChunkToLock, async (blockNumber) => {
           let block = await getBlock(web3, blockNumber);
           await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
-          _.pull(buckets[index], blockNumber);
+          _.pull(newChunkToLock, blockNumber);
           this.events.emit('block', block);
         }).catch(() => {
           delete locker[web3.index];
         });
-        buckets = _.filter(buckets, bucket => bucket.length);
-
+        console.log('before: ',buckets.length)
+        _.pull(buckets, newChunkToLock);
+        console.log('after: ', buckets.length)
+        delete locker[web3.index];
+      } else {
+        await Promise.delay(1000);
       }
 
     }
   }
-
-};
+}
 
 module.exports = SyncCacheService;
