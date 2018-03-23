@@ -16,52 +16,60 @@ const config = require('../config'),
  * @returns {Promise.<*>}
  */
 
+class SyncCacheService {
 
-const runPeer = async (web3, buckets, locker, index) => {
-
-  while (buckets.length) {
-    let lockerChunks = _.keys(locker);
-    let newChunkToLock = _.chain(buckets).reject(item => _.find(lockerChunks, lock => _.isEqualWith(lock, item))).head().value();
-    if (newChunkToLock) {
-      locker[web3.index] = newChunkToLock;
-
-      await Promise.mapSeries(buckets[index], async (blockNumber) => {
-        let block = await getBlock(web3, blockNumber);
-        log.info(`${block.hash} ${block.number} added to cache by connection ${index}`);
-        await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
-        _.pull(buckets[index], blockNumber);
-      }).catch(() => {
-        delete locker[web3.index];
-      });
-      buckets = _.filter(buckets, bucket => bucket.length);
-
-    }
-
+  constructor (web3s) {
+    this.web3s = web3s;
+    this.events = new EventEmitter();
+    this.isSyncing = true;
   }
 
-};
+  async start () {
 
-module.exports = async (web3s) => {
+    while (this.isSyncing) {
+      try {
+        let buckets = await allocateBlockBuckets(this.web3s);
+        let locker = {};
 
-  let isSyncing = true;
+        while (buckets.length) {
 
-  while (isSyncing) {
-    try {
-      let buckets = await allocateBlockBuckets(web3s);
-      let locker = {};
+          await Promise.map(this.web3s, async (web3, index) => {
+            return await this.runPeer(web3, buckets, locker, index);
+          });
+        }
 
-      while (buckets.length) {
+      } catch (e) {
+        if (_.get(e, 'code') === 0) {
+          log.info('nodes are down or not synced!');
+          process.exit(0);
+        }
+      }
+    }
+  }
 
-        await Promise.map(web3s, async (web3, index) => {
-          return await runPeer(web3, buckets, locker, index);
+  async runPeer (web3, buckets, locker, index) {
+
+    while (buckets.length) {
+      let lockerChunks = _.keys(locker);
+      let newChunkToLock = _.chain(buckets).reject(item => _.find(lockerChunks, lock => _.isEqualWith(lock, item))).head().value();
+      if (newChunkToLock) {
+        locker[web3.index] = newChunkToLock;
+
+        await Promise.mapSeries(buckets[index], async (blockNumber) => {
+          let block = await getBlock(web3, blockNumber);
+          await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
+          _.pull(buckets[index], blockNumber);
+          this.events.emit('block', block);
+        }).catch(() => {
+          delete locker[web3.index];
         });
+        buckets = _.filter(buckets, bucket => bucket.length);
+
       }
 
-    } catch (e) {
-      if (_.get(e, 'code') === 0) {
-        log.info('nodes are down or not synced!');
-        process.exit(0);
-      }
     }
   }
+
 };
+
+module.exports = SyncCacheService;
