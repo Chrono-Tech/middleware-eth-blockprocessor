@@ -5,6 +5,7 @@
  */
 
 require('dotenv').config();
+const _ = require('lodash');
 
 const config = {
   mongo: {
@@ -26,7 +27,10 @@ const config = {
   },
   web3: {
     network: process.env.NETWORK || 'development',
-    uri: `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${process.env.WEB3_URI || `/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
+    providers: _.chain(process.env.PROVIDERS).split(',').map(provider => provider.trim()).value() || [
+      `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
+    ],
+
   }
 };
 
