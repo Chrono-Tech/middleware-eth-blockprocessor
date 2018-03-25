@@ -97,7 +97,7 @@ class BlockWatchingService {
           await blockModel.remove({hash: {$in: this.lastBlocks}});
           const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
           this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).reverse().value();
-          this.currentHeight = lastCheckpointBlock - 1;
+          this.currentHeight = lastCheckpointBlock.number - 1;
         }
       }
     }

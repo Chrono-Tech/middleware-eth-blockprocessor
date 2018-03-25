@@ -29,7 +29,7 @@ class SyncCacheService {
     while (this.isSyncing) {
       try {
         let buckets = await allocateBlockBuckets(this.web3s);
-        let locker = {};
+        let locker = {stack: {}, lock: false};
 
         while (buckets.length) {
 
@@ -41,7 +41,6 @@ class SyncCacheService {
         this.isSyncing = false;
 
       } catch (e) {
-        console.log(e)
         if (_.get(e, 'code') === 0) {
           log.info('nodes are down or not synced!');
           process.exit(0);
@@ -53,28 +52,44 @@ class SyncCacheService {
   async runPeer (web3, buckets, locker, index) {
 
     while (buckets.length) {
-      let lockerChunks = _.values(locker);
+      if (locker.lock) {
+        await Promise.delay(1000);
+        continue;
+      }
+
+      locker.lock = true;
+      let lockerChunks = _.values(locker.stack);
       let newChunkToLock = _.chain(buckets).reject(item =>
         _.find(lockerChunks, lock => lock[0] === item[0])
       ).head().value();
 
-      if (newChunkToLock) {
-        locker[index] = newChunkToLock;
-        await Promise.mapSeries(newChunkToLock, async (blockNumber) => {
-          let block = await getBlock(web3, blockNumber);
-          await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
-          _.pull(newChunkToLock, blockNumber);
-          this.events.emit('block', block);
-        }).catch(() => {
-          delete locker[web3.index];
-        });
-        console.log('before: ',buckets.length)
-        _.pull(buckets, newChunkToLock);
-        console.log('after: ', buckets.length)
-        delete locker[web3.index];
-      } else {
-        await Promise.delay(1000);
+      let lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(newChunkToLock), true).timeout(1000).catch(() => null);
+      locker.lock = false;
+
+      if (!newChunkToLock || !lastBlock) {
+        delete locker.stack[index];
+        await Promise.delay(10000);
+        continue;
       }
+
+      console.log('process', index, 'took chuck started with', newChunkToLock[0]);
+      locker.stack[index] = newChunkToLock;
+      await Promise.mapSeries(newChunkToLock, async (blockNumber) => {
+        let block = await getBlock(web3, blockNumber);
+        await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
+        _.pull(newChunkToLock, blockNumber);
+        this.events.emit('block', block);
+      }).catch((e) => {
+        if (e && e.code === 11000) {
+          console.log(e);
+          _.pull(newChunkToLock, newChunkToLock[0]);
+        }
+      });
+
+      if (!newChunkToLock.length)
+        _.pull(buckets, newChunkToLock);
+
+      delete locker.stack[index];
 
     }
   }

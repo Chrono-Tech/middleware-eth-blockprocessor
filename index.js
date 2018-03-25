@@ -73,7 +73,7 @@ const init = async () => {
   const syncCacheService = new SyncCacheService(web3s);
 
   syncCacheService.events.on('block', async block => {
-    log.info('%s (%d) added to cache.', block.hash, block.number);
+    //log.info('%s (%d) added to cache.', block.hash, block.number);
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
     for (let tx of filteredTxs) {
@@ -89,6 +89,7 @@ const init = async () => {
 
   await syncCacheService.start();
   log.info('cached the whole blockchain!');
+  process.exit(0);
 
   let blockEventCallback = async block => {
     log.info('%s (%d) added to cache.', block.hash, block.number);
