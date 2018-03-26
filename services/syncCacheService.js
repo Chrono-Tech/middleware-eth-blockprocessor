@@ -23,9 +23,9 @@ class SyncCacheService {
   }
 
   async start () {
-    let buckets = await allocateBlockBuckets(this.web3s);
-    this.doJob(buckets);
-    return _.get(buckets, '0.0', 0);
+    let data = await allocateBlockBuckets(this.web3s);
+    this.doJob(data.missedBuckets);
+    return data.height;
   }
 
   async doJob (buckets) {

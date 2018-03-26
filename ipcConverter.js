@@ -15,10 +15,11 @@ const net = require('net'),
 
 let RPCServer = TestRPC.server();
 RPCServer.listen(8545);
+const web3ProviderUri = `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${config.web3.providers[0]}`;
 
 let addresses = _.chain(RPCServer.provider.manager.state.accounts)
   .toPairs()
-  .map(pair=> {
+  .map(pair => {
     pair[1] = Buffer.from(pair[1].secretKey, 'hex').toString('hex');
     return pair;
   })
@@ -27,13 +28,11 @@ let addresses = _.chain(RPCServer.provider.manager.state.accounts)
 
 console.log(addresses);
 
-
-
 // create RPC server
 const server = net.createServer(stream => {
   stream.on('data', c => {
     let stringMsg;
-    try { 
+    try {
       stringMsg = c.toString()
         .replace(/}\[{/g, '}{')
         .replace(/}\]{/g, '}{')
@@ -57,9 +56,9 @@ const server = net.createServer(stream => {
   });
 })
   .on('error', err => {
-  // If pipe file exists try to remove it & start server again
-    if(err.code === 'EADDRINUSE' && removePipeFile(config.web3.uri))
-      server.listen(config.web3.uri);
+    // If pipe file exists try to remove it & start server again
+    if (err.code === 'EADDRINUSE' && removePipeFile(web3ProviderUri))
+      server.listen(web3ProviderUri);
     else
       process.exit(1);
   });
@@ -81,7 +80,7 @@ const removePipeFile = filename => {
 
 // Create directory for Win32
 if (!/^win/.test(process.platform)) {
-  let pathIpc = path.parse(config.web3.uri).dir;
+  let pathIpc = path.parse(web3ProviderUri).dir;
 
   if (!fs.existsSync(pathIpc))
     fs.mkdirSync(pathIpc);
@@ -105,12 +104,13 @@ if (process.platform === 'win32') {
 
 process.on('SIGINT', function () {
   try {
-    removePipeFile(config.web3.uri);
-  } catch (e) {}
+    removePipeFile(web3ProviderUri);
+  } catch (e) {
+  }
   process.exit();
 });
 
 //Going to start server 
-server.listen(config.web3.uri, () => {
+server.listen(web3ProviderUri, () => {
   log.info(`Server: on listening for network - ${config.web3.network}`);
 });

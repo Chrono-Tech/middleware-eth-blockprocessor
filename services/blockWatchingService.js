@@ -28,14 +28,18 @@ class BlockWatchingService {
     if (this.isSyncing)
       return;
 
-    this.web3 = await Promise.race(this.web3s.map(async (web3) => {
-      let height = await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => 0);
-      if (!height)
-        await Promise.delay(5000);
+    this.web3 = await Promise.any(this.web3s.map(async (web3) => {
+      let height = await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => -1);
+      if (height === -1)
+        return await Promise.reject();
+
+      if (height === 0)
+        await Promise.delay(3000);
+
       return web3;
     }));
 
-    if (!(await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(1000).catch(() => 0)))
+    if ((await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(1000).catch(() => -1)) === -1)
       return Promise.reject({code: 0});
 
     await this.indexCollection();
@@ -45,8 +49,11 @@ class BlockWatchingService {
     if (!pendingBlock)
       await blockModel.remove({number: -1});
 
-    const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
-    this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
+    const currentBlocks = await blockModel.find({
+      network: config.web3.network,
+      number: {$lte: this.currentHeight}
+    }).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
+    //this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
     this.doJob();
@@ -55,7 +62,7 @@ class BlockWatchingService {
   }
 
   async doJob () {
-    while (this.isSyncing) 
+    while (this.isSyncing)
       try {
         let block = await this.processBlock();
         await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
@@ -96,8 +103,14 @@ class BlockWatchingService {
           this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).reverse().value();
           this.currentHeight = lastCheckpointBlock.number - 1;
         }
+
+        if (_.get(err, 'code') === 2) {
+          log.info(`the current provider hasn't reached the synced state, await the sync until block ${this.currentHeight}`);
+          await Promise.delay(10000);
+        }
+
       }
-    
+
   }
 
   async UnconfirmedTxEvent (err, result) {
@@ -149,7 +162,7 @@ class BlockWatchingService {
     }
 
     if (block < this.currentHeight)
-      return Promise.reject({code: 1}); //head has been blown off
+      return Promise.reject({code: 2}); //head has been blown off
 
     const lastBlockHashes = await Promise.mapSeries(this.lastBlocks, async blockHash => await Promise.promisify(this.web3.eth.getBlock)(blockHash, false).timeout(10000));
 
