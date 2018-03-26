@@ -12,7 +12,8 @@ mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
 mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri, {useMongoClient: true});
 
 const _ = require('lodash'),
-  BlockCacheService = require('./services/blockCacheService'),
+  BlockWatchingService = require('./services/blockWatchingService'),
+  SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
   Web3 = require('web3'),
   net = require('net'),
@@ -29,14 +30,27 @@ const _ = require('lodash'),
 
 const init = async () => {
 
-  const provider = new Web3.providers.IpcProvider(config.web3.uri, net);
-  const web3 = new Web3();
-  web3.setProvider(provider);
-  const blockCacheService = new BlockCacheService(web3);
+  const web3s = config.web3.providers.map((providerURI) => {
+    const provider = /^http/.test(providerURI) ?
+      new Web3.providers.HttpProvider(providerURI) :
+      new Web3.providers.IpcProvider(`${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${providerURI}`, net);
 
-  web3.currentProvider.connection.on('end', () => {
-    log.error('ipc process has finished!');
-    process.exit(0);
+    const web3 = new Web3();
+    web3.setProvider(provider);
+
+    if (_.has(web3, 'currentProvider.connection.on')) {
+      web3.currentProvider.connection.on('end', async () => {
+        await Promise.delay(5000);
+        web3.reset();
+      });
+
+      web3.currentProvider.connection.on('error', async () => {
+        await Promise.delay(5000);
+        web3.reset();
+      });
+    }
+
+    return web3;
   });
 
   let amqpInstance = await amqp.connect(config.rabbit.url)
@@ -54,8 +68,10 @@ const init = async () => {
 
   await channel.assertExchange('events', 'topic', {durable: false});
 
-  blockCacheService.events.on('block', async block => {
-    log.info('%s (%d) added to cache.', block.hash, block.number);
+  const syncCacheService = new SyncCacheService(web3s);
+
+  syncCacheService.events.on('block', async block => {
+    log.info(`${block.hash} (${block.number}) added to cache.`);
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
     for (let tx of filteredTxs) {
@@ -69,18 +85,34 @@ const init = async () => {
     }
   });
 
-  await blockCacheService.startSync();
+  let endBlock = await syncCacheService.start()
+    .catch((err) => {
+      if (_.get(err, 'code') === 0) {
+        log.info('nodes are down or not synced!');
+        process.exit(0);
+      }
+      log.error(err);
+    });
 
-  web3.eth.filter('pending').watch(async (err, result) => {
+  syncCacheService.events.on('end', () => {
+    log.info(`cached the whole blockchain up to block: ${endBlock}`);
+  });
 
-    if (err || !await blockCacheService.isSynced())
-      return;
+  let blockEventCallback = async block => {
+    log.info(`${block.hash} (${block.number}) added to cache.`);
+    const filteredTxs = await filterTxsByAccountService(block.transactions);
 
-    let tx = await Promise.promisify(web3.eth.getTransaction)(result);
+    for (let tx of filteredTxs) {
+      let addresses = _.chain([tx.to, tx.from])
+        .union(tx.logs.map(log => log.address))
+        .uniq()
+        .value();
 
-    tx.logs = [];
-    if (!_.has(tx, 'hash'))
-      return;
+      for (let address of addresses)
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
+    }
+  };
+  let txEventCallback = async tx => {
 
     const data = await filterTxsByAccountService([tx]);
 
@@ -96,7 +128,26 @@ const init = async () => {
         await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(filteredTx)));
     }
 
-  });
+  };
+
+  const runCacheService = async () => {
+
+    let blockWatchingService = new BlockWatchingService(web3s, endBlock);
+
+    blockWatchingService.events.on('block', blockEventCallback);
+    blockWatchingService.events.on('tx', txEventCallback);
+
+    await blockWatchingService.startSync().catch(err => {
+      if (_.get(err, 'code') === 0) {
+        log.error('no connections available or blockchain is not synced!');
+        process.exit(0);
+      }
+    });
+
+    blockWatchingService.events.on('error', runCacheService);
+  };
+
+  runCacheService();
 
 };
 

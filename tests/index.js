@@ -30,7 +30,8 @@ describe('core/block processor', function () {
   before(async () => {
     await clearMongoBlocks();
     amqpInstance = await amqp.connect(config.rabbit.url);
-    let provider = new Web3.providers.IpcProvider(config.web3.uri, net);
+    const web3ProviderUri = `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${config.web3.providers[0]}`;
+    let provider = new Web3.providers.IpcProvider(web3ProviderUri, net);
     web3.setProvider(provider);
 
     accounts = await Promise.promisify(web3.eth.getAccounts)();
