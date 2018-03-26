@@ -22,7 +22,7 @@ module.exports = async function (web3s) {
     log.info(`validating blocks from: ${_.head(blockNumberChunk)} to ${_.last(blockNumberChunk)}`);
     const count = await blockModel.count({network: config.web3.network, number: {$in: blockNumberChunk}});
     if (count !== blockNumberChunk.length)
-      missedBuckets.push(blockNumberChunk)
+      missedBuckets.push(blockNumberChunk);
   }
 
   for (let missedBucket of missedBuckets)
@@ -30,7 +30,7 @@ module.exports = async function (web3s) {
       log.info(`validating block: ${blockNumber}`);
       const isExist = await blockModel.count({network: config.web3.network, number: blockNumber});
       if (!isExist)
-        missedBlocks.push(blockNumber)
+        missedBlocks.push(blockNumber);
     }
 
   let currentNodesHeight = await Promise.mapSeries(web3s, async web3 => await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => 0));

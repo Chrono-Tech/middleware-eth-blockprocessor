@@ -71,7 +71,7 @@ const init = async () => {
   const syncCacheService = new SyncCacheService(web3s);
 
   syncCacheService.events.on('block', async block => {
-    //log.info('%s (%d) added to cache.', block.hash, block.number);
+    log.info(`${block.hash} (${block.number}) added to cache.`);
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
     for (let tx of filteredTxs) {
@@ -85,19 +85,21 @@ const init = async () => {
     }
   });
 
-  let endBlock = await syncCacheService.start().catch((e)=>console.log(e));
+  let endBlock = await syncCacheService.start()
+    .catch((err) => {
+      if (_.get(err, 'code') === 0) {
+        log.info('nodes are down or not synced!');
+        process.exit(0);
+      }
+      log.error(err);
+    });
 
-  console.log(endBlock)
-
-  //process.exit(0);
-
-
-/*    .then(() =>
-      log.info('cached the whole blockchain!')
-    );*/
+  syncCacheService.events.on('end', () => {
+    log.info(`cached the whole blockchain up to block: ${endBlock}`);
+  });
 
   let blockEventCallback = async block => {
-    //log.info('%s (%d) added to cache.', block.hash, block.number);
+    log.info(`${block.hash} (${block.number}) added to cache.`);
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
     for (let tx of filteredTxs) {
@@ -112,7 +114,6 @@ const init = async () => {
   };
   let txEventCallback = async tx => {
 
-    console.log(tx)
     const data = await filterTxsByAccountService([tx]);
 
     for (let filteredTx of data) {
@@ -136,7 +137,12 @@ const init = async () => {
     blockWatchingService.events.on('block', blockEventCallback);
     blockWatchingService.events.on('tx', txEventCallback);
 
-    await blockWatchingService.startSync();
+    await blockWatchingService.startSync().catch(err => {
+      if (_.get(err, 'code') === 0) {
+        log.error('no connections available or blockchain is not synced!');
+        process.exit(0);
+      }
+    });
 
     blockWatchingService.events.on('error', runCacheService);
   };

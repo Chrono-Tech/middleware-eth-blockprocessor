@@ -32,13 +32,11 @@ class BlockWatchingService {
       let height = await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => 0);
       if (!height)
         await Promise.delay(5000);
-      return web3
+      return web3;
     }));
 
-    if (!(await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(1000).catch(() => 0))) {
-      log.error('no connections available!');
-      process.exit(0);
-    }
+    if (!(await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(1000).catch(() => 0)))
+      return Promise.reject({code: 0});
 
     await this.indexCollection();
     this.isSyncing = true;
@@ -53,11 +51,11 @@ class BlockWatchingService {
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
     this.doJob();
     this.pendingFilter = this.web3.eth.filter('pending');
-    this.pendingFilter.watch((err, result) => this.UnconfirmedTxEvent(err, result))
+    this.pendingFilter.watch((err, result) => this.UnconfirmedTxEvent(err, result));
   }
 
   async doJob () {
-    while (this.isSyncing) {
+    while (this.isSyncing) 
       try {
         let block = await this.processBlock();
         await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
@@ -81,7 +79,7 @@ class BlockWatchingService {
           continue;
 
         if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString()) {
-          await this.stopSync().catch(e => console.log(e));
+          await this.stopSync().catch(e => log.error(e));
           return this.events.emit('error', {code: 3});
         }
 
@@ -99,7 +97,7 @@ class BlockWatchingService {
           this.currentHeight = lastCheckpointBlock.number - 1;
         }
       }
-    }
+    
   }
 
   async UnconfirmedTxEvent (err, result) {
@@ -116,23 +114,23 @@ class BlockWatchingService {
 
     const block = await Promise.promisify(this.web3.eth.getBlock)('pending', true);
     let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || new blockModel({
-        number: -1,
-        hash: null,
-        timestamp: 0,
-        txs: []
-      });
+      number: -1,
+      hash: null,
+      timestamp: 0,
+      txs: []
+    });
 
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
     await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']),
       {upsert: true})
       .catch(err => log.error(err));
-    this.events.emit('tx', tx)
+    this.events.emit('tx', tx);
 
   }
 
   async stopSync () {
     this.isSyncing = false;
-    await new Promise((res, rej) =>
+    await new Promise((res) =>
       this.pendingFilter.stopWatching(res)
     );
   }

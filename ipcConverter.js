@@ -35,10 +35,10 @@ const server = net.createServer(stream => {
     let stringMsg;
     try { 
       stringMsg = c.toString()
-      .replace(/}\[{/g, '}{')
-      .replace(/}\]{/g, '}{')
-      .replace(/}\]\[{/g, '}{')
-      .replace(/}{/g, '},{');
+        .replace(/}\[{/g, '}{')
+        .replace(/}\]{/g, '}{')
+        .replace(/}\]\[{/g, '}{')
+        .replace(/}{/g, '},{');
       JSON.parse('[' + stringMsg + ']').forEach((string) => {
         RPCServer.provider.sendAsync(string, (err, data) => {
           stream.cork();

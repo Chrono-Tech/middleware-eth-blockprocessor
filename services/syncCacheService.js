@@ -1,13 +1,11 @@
-const config = require('../config'),
-  bunyan = require('bunyan'),
+const bunyan = require('bunyan'),
   _ = require('lodash'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   allocateBlockBuckets = require('../utils/allocateBlockBuckets'),
   blockModel = require('../models/blockModel'),
-  web3Errors = require('web3/lib/web3/errors'),
   getBlock = require('../utils/getBlock'),
-  log = bunyan.createLogger({name: 'app.services.blockCacheService'});
+  log = bunyan.createLogger({name: 'app.services.syncCacheService'});
 
 /**
  * @service
@@ -32,26 +30,23 @@ class SyncCacheService {
 
   async doJob (buckets) {
 
-    while (this.isSyncing) {
+    while (this.isSyncing) 
       try {
-        console.log('!!')
         let locker = {stack: {}, lock: false};
 
-        while (buckets.length) {
+        while (buckets.length) 
           await Promise.map(this.web3s, async (web3, index) => {
             return await this.runPeer(web3, buckets, locker, index);
           });
-        }
+        
 
         this.isSyncing = false;
+        this.events.emit('end');
 
-      } catch (e) {
-        if (_.get(e, 'code') === 0) {
-          log.info('nodes are down or not synced!');
-          process.exit(0);
-        }
+      } catch (err) {
+        log.error(err);
       }
-    }
+    
   }
 
   async runPeer (web3, buckets, locker, index) {
@@ -77,17 +72,17 @@ class SyncCacheService {
         continue;
       }
 
-      console.log('process', index, 'took chuck started with', newChunkToLock[0]);
+      log.info(`web3 provider ${index} took chuck of blocks ${newChunkToLock[0]} - ${_.last(newChunkToLock)}`);
       locker.stack[index] = newChunkToLock;
-      await Promise.map(newChunkToLock, async (blockNumber) => {
+      await Promise.mapSeries(newChunkToLock, async (blockNumber) => {
         let block = await getBlock(web3, blockNumber);
         await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
         _.pull(newChunkToLock, blockNumber);
         this.events.emit('block', block);
-      }, {concurrency: 10}).catch((e) => {
-        if (e && e.code === 11000) {
+      }).catch((e) => {
+        if (e && e.code === 11000) 
           _.pull(newChunkToLock, newChunkToLock[0]);
-        }
+        
       });
 
       if (!newChunkToLock.length)
