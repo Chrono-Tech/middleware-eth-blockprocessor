@@ -15,10 +15,10 @@ module.exports = async function (web3s) {
     blockNumbers.push(i);
 
   const blockNumberChunks = _.chunk(blockNumbers, 100000);
-  const missedBuckets = [];
+  let missedBuckets = [];
   const missedBlocks = [];
 
-/*  for (let blockNumberChunk of blockNumberChunks) {
+  for (let blockNumberChunk of blockNumberChunks) {
     log.info(`validating blocks from: ${_.head(blockNumberChunk)} to ${_.last(blockNumberChunk)}`);
     const count = await blockModel.count({network: config.web3.network, number: {$in: blockNumberChunk}});
     if (count !== blockNumberChunk.length)
@@ -31,17 +31,17 @@ module.exports = async function (web3s) {
       const isExist = await blockModel.count({network: config.web3.network, number: blockNumber});
       if (!isExist)
         missedBlocks.push(blockNumber)
-    }*/
+    }
 
   let currentNodesHeight = await Promise.mapSeries(web3s, async web3 => await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => 0));
-  const maxEqualHeight = _.max(currentNodesHeight);
+  const deltaEqualHeight = config.cache.syncMax ? _.max(currentNodesHeight) : _.chain(currentNodesHeight).compact().min().add(0).value();
 
-  for (let i = currentCacheHeight + 1; i < maxEqualHeight - config.consensus.lastBlocksValidateAmount; i++)
+  for (let i = currentCacheHeight + 1; i < deltaEqualHeight - config.consensus.lastBlocksValidateAmount; i++)
     missedBlocks.push(i);
 
-  missedBuckets.push(..._.chunk(missedBlocks, 10000));
+  missedBuckets = _.chain(missedBlocks).reverse().chunk(10000).value();
 
-  if (!maxEqualHeight)
+  if (!currentNodesHeight)
     return Promise.reject({code: 0});
 
   return missedBuckets;

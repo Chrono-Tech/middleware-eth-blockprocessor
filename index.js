@@ -40,13 +40,11 @@ const init = async () => {
 
     if (_.has(web3, 'currentProvider.connection.on')) {
       web3.currentProvider.connection.on('end', async () => {
-        //log.error(`node connection has finished on address: ${providerURI}`);
         await Promise.delay(5000);
         web3.reset();
       });
 
       web3.currentProvider.connection.on('error', async () => {
-        //log.error(`error - node connection has finished on address: ${providerURI}`);
         await Promise.delay(5000);
         web3.reset();
       });
@@ -87,12 +85,19 @@ const init = async () => {
     }
   });
 
-  await syncCacheService.start();
-  log.info('cached the whole blockchain!');
-  process.exit(0);
+  let endBlock = await syncCacheService.start().catch((e)=>console.log(e));
+
+  console.log(endBlock)
+
+  //process.exit(0);
+
+
+/*    .then(() =>
+      log.info('cached the whole blockchain!')
+    );*/
 
   let blockEventCallback = async block => {
-    log.info('%s (%d) added to cache.', block.hash, block.number);
+    //log.info('%s (%d) added to cache.', block.hash, block.number);
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
     for (let tx of filteredTxs) {
@@ -107,6 +112,7 @@ const init = async () => {
   };
   let txEventCallback = async tx => {
 
+    console.log(tx)
     const data = await filterTxsByAccountService([tx]);
 
     for (let filteredTx of data) {
@@ -125,7 +131,7 @@ const init = async () => {
 
   const runCacheService = async () => {
 
-    let blockWatchingService = new BlockWatchingService(web3s);
+    let blockWatchingService = new BlockWatchingService(web3s, endBlock);
 
     blockWatchingService.events.on('block', blockEventCallback);
     blockWatchingService.events.on('tx', txEventCallback);

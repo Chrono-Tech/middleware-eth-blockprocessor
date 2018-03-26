@@ -16,10 +16,10 @@ const config = require('../config'),
 
 class BlockWatchingService {
 
-  constructor (web3s) {
+  constructor (web3s, currentHeight) {
     this.web3s = web3s;
     this.events = new EventEmitter();
-    this.currentHeight = 0;
+    this.currentHeight = currentHeight;
     this.lastBlocks = [];
     this.isSyncing = false;
   }
@@ -54,7 +54,6 @@ class BlockWatchingService {
     this.doJob();
     this.pendingFilter = this.web3.eth.filter('pending');
     this.pendingFilter.watch((err, result) => this.UnconfirmedTxEvent(err, result))
-
   }
 
   async doJob () {
@@ -109,9 +108,11 @@ class BlockWatchingService {
       return;
 
     let tx = await Promise.promisify(this.web3.eth.getTransaction)(result);
-    tx.logs = [];
+
     if (!_.has(tx, 'hash'))
       return;
+
+    tx.logs = [];
 
     const block = await Promise.promisify(this.web3.eth.getBlock)('pending', true);
     let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || new blockModel({

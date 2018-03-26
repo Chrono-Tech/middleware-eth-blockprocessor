@@ -25,12 +25,18 @@ const config = {
     url: process.env.RABBIT_URI || 'amqp://localhost:5672',
     serviceName: process.env.RABBIT_SERVICE_NAME || 'app_eth'
   },
+  cache: {
+    syncMax: process.env.CACHE_SYNC_MAX || false
+  },
   web3: {
     network: process.env.NETWORK || 'development',
-    providers: _.chain(process.env.PROVIDERS).split(',').map(provider => provider.trim()).value() || [
-      `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${`/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
-    ],
-
+    providers: _.chain(process.env.PROVIDERS).split(',')
+      .map(provider => provider.trim())
+      .filter(provider => provider.length)
+      .thru(prov => prov.length ? prov : [
+        `${process.env.WEB3_URI || `/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
+      ])
+      .value()
   }
 };
 

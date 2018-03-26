@@ -25,14 +25,19 @@ class SyncCacheService {
   }
 
   async start () {
+    let buckets = await allocateBlockBuckets(this.web3s);
+    this.doJob(buckets);
+    return _.get(buckets, '0.0', 0);
+  }
+
+  async doJob (buckets) {
 
     while (this.isSyncing) {
       try {
-        let buckets = await allocateBlockBuckets(this.web3s);
+        console.log('!!')
         let locker = {stack: {}, lock: false};
 
         while (buckets.length) {
-
           await Promise.map(this.web3s, async (web3, index) => {
             return await this.runPeer(web3, buckets, locker, index);
           });
@@ -74,14 +79,13 @@ class SyncCacheService {
 
       console.log('process', index, 'took chuck started with', newChunkToLock[0]);
       locker.stack[index] = newChunkToLock;
-      await Promise.mapSeries(newChunkToLock, async (blockNumber) => {
+      await Promise.map(newChunkToLock, async (blockNumber) => {
         let block = await getBlock(web3, blockNumber);
         await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
         _.pull(newChunkToLock, blockNumber);
         this.events.emit('block', block);
-      }).catch((e) => {
+      }, {concurrency: 10}).catch((e) => {
         if (e && e.code === 11000) {
-          console.log(e);
           _.pull(newChunkToLock, newChunkToLock[0]);
         }
       });
