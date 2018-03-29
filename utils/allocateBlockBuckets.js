@@ -7,22 +7,25 @@ const _ = require('lodash'),
 
 module.exports = async function (web3s) {
 
-  const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(1);
-  const currentCacheHeight = _.chain(currentBlocks).get('0.number', -1).value();
+  const currentBlock = await blockModel.findOne({network: config.web3.network}, {number: 1}, {sort: {number: -1}});
+  const currentCacheHeight = _.get(currentBlock, 'number', -1);
 
   let blockNumbers = [];
   for (let i = 0; i < currentCacheHeight; i++)
     blockNumbers.push(i);
 
-  const blockNumberChunks = _.chunk(blockNumbers, 100000);
+  const blockNumberChunks = _.chunk(blockNumbers, 10000);
   let missedBuckets = [];
   const missedBlocks = [];
 
   for (let blockNumberChunk of blockNumberChunks) {
     log.info(`validating blocks from: ${_.head(blockNumberChunk)} to ${_.last(blockNumberChunk)}`);
     const count = await blockModel.count({network: config.web3.network, number: {$in: blockNumberChunk}});
-    if (count !== blockNumberChunk.length)
+    if (count !== blockNumberChunk.length && count)
       missedBuckets.push(blockNumberChunk);
+    if (!count)
+      for (let blockNumber of blockNumberChunk)
+        missedBlocks.push(blockNumber);
   }
 
   for (let missedBucket of missedBuckets)

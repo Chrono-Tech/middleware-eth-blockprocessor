@@ -15,16 +15,7 @@ This module is used for updating balances for registered accounts (see a descrip
 
 #### How does it work?
 
-Block processor connects to ipc and fetch blocks one by one. The current prcessed block number then is going to be saved in mongodb unnder "ethblocks" collection with a your current network_name. For instance, if module has parsed 120345 blocks, and the ipc's network_name=super_network, then in mongo, under ethblocks you will find this record:
-```
-{
-    "_id" : ObjectId("599fc7a497ffcb108c863986"),
-    "network" : "super_network",
-    "__v" : 0,
-    "created" : ISODate("2017-08-25T06:46:22.242Z"),
-    "block" : 120345
-}
-```
+Block processor connects to ipc, fetch blocks one by one and cache them in mongodb.
 
 Which txs block processor filter?
 
@@ -97,6 +88,13 @@ All in all, in order to be subscribed, you need to do the following:
 
 But be aware of it - when a new tx arrives, the block processor sends 2 messages for the same one transaction - for both addresses, who participated in transaction (from and to recepients). The sent message represent the payload field from transaction object (by this unique field you can easely fetch the raw transaction from mongodb for your own purpose).
 
+
+### multiple ipc providers
+In order to increase stability and speed up the syncing process itself, we have introduced an ability to specify several connections to nodes via ipc. The worflow is simple:
+1) during caching, the necessary blocks, which should be processed, are divided into chunks, each connection should get its chunk and place to mongodb cache. In case, the connection has been dropped, these chunks are going to be processed by next connection
+2) During scanning for the latest blocks, we pick up only single connection (through the race condition). In case, the connection got down - we pick up another one.
+
+
 ##### сonfigure your .env
 
 To apply your configuration, create a .env file in root folder of repo (in case it's not present already).
@@ -112,7 +110,11 @@ MONGO_DATA_COLLECTION_PREFIX=eth
 RABBIT_URI=amqp://localhost:5672
 RABBIT_SERVICE_NAME=app_eth
 NETWORK=development
-WEB3_URI=/tmp/development/geth.ipc
+
+SYNC_SHADOW=1
+#WEB3_URI=/tmp/development/geth.ipc
+
+PROVIDERS=tmp/development/geth.ipc,tmp/development/geth2.ipc
 ```
 
 The options are presented below:
@@ -128,7 +130,9 @@ The options are presented below:
 | RABBIT_URI   | rabbitmq URI connection string
 | RABBIT_SERVICE_NAME   | namespace for all rabbitmq queues, like 'app_eth_transaction'
 | NETWORK   | network name (alias)- is used for connecting via ipc (see block processor section)
-| WEB3_URI   | the path to ipc interface
+| SYNC_SHADOW   | sync blocks in background
+| PROVIDERS   | the paths to ipc interface, written with comma sign
+| WEB3_URI (deprecated)   | the path to ipc interface
 
 License
 ----
