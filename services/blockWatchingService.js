@@ -42,7 +42,6 @@ class BlockWatchingService {
     if ((await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(1000).catch(() => -1)) === -1)
       return Promise.reject({code: 0});
 
-    await this.indexCollection();
     this.isSyncing = true;
 
     const pendingBlock = await Promise.promisify(this.web3.eth.getBlock)('pending').timeout(10000);
@@ -93,21 +92,26 @@ class BlockWatchingService {
         if (_.get(err, 'code') === 0) {
           log.info(`await for next block ${this.currentHeight + 1}`);
           await Promise.delay(10000);
+          continue;
         }
 
-        if (_.get(err, 'code') === 1) {
+        if ([1, 11000].includes(_.get(err, 'code'))) {
           let lastCheckpointBlock = await blockModel.findOne({hash: this.lastBlocks[0]});
           log.info(`wrong sync state!, rollback to ${lastCheckpointBlock.number - 1} block`);
           await blockModel.remove({hash: {$in: this.lastBlocks}});
           const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
           this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).reverse().value();
-          this.currentHeight = lastCheckpointBlock.number - 1;
+          this.currentHeight = lastCheckpointBlock.number;
+          continue;
         }
 
         if (_.get(err, 'code') === 2) {
           log.info(`the current provider hasn't reached the synced state, await the sync until block ${this.currentHeight}`);
           await Promise.delay(10000);
+          continue;
         }
+
+        log.error(err);
 
       }
 
@@ -190,12 +194,6 @@ class BlockWatchingService {
 
     rawBlock.network = config.web3.network;
     return rawBlock;
-  }
-
-  async indexCollection () {
-    log.info('indexing...');
-    await blockModel.init();
-    log.info('indexation completed!');
   }
 
   async isSynced () {
