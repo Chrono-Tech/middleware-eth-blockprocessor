@@ -23,6 +23,7 @@ class SyncCacheService {
   }
 
   async start () {
+    await this.indexCollection();
     let data = await allocateBlockBuckets(this.web3s);
     this.doJob(data.missedBuckets);
     return data.height;
@@ -47,6 +48,13 @@ class SyncCacheService {
         log.error(err);
       }
     
+  }
+
+
+  async indexCollection () {
+    log.info('indexing...');
+    await blockModel.init();
+    log.info('indexation completed!');
   }
 
   async runPeer (web3, buckets, locker, index) {
