@@ -25,6 +25,9 @@ const config = {
     url: process.env.RABBIT_URI || 'amqp://localhost:5672',
     serviceName: process.env.RABBIT_SERVICE_NAME || 'app_eth'
   },
+  sync: {
+    shadow: parseInt(process.env.SYNC_SHADOW) || true
+  },
   web3: {
     network: process.env.NETWORK || 'development',
     providers: _.chain(process.env.PROVIDERS).split(',')

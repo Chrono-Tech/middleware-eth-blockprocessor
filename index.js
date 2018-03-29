@@ -94,8 +94,14 @@ const init = async () => {
       log.error(err);
     });
 
-  syncCacheService.events.on('end', () => {
-    log.info(`cached the whole blockchain up to block: ${endBlock}`);
+  await new Promise((res) => {
+    if (config.sync.shadow)
+      return res();
+
+    syncCacheService.events.on('end', () => {
+      log.info(`cached the whole blockchain up to block: ${endBlock}`);
+      res();
+    });
   });
 
   let blockEventCallback = async block => {
