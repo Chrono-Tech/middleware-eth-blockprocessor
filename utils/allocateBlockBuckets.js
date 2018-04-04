@@ -37,19 +37,19 @@ module.exports = async function (web3s) {
     }
 
   let currentNodesHeight = await Promise.mapSeries(web3s, async web3 => await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => -1));
-  const deltaEqualHeight = _.chain(currentNodesHeight).reject(height => height === -1)
+  const currentNodeHeight = _.chain(currentNodesHeight).reject(height => height === -1)
     .max()
-    .thru(item => _.isUndefined(item) ? -1 : item)
+    .defaults(-1)
     .value();
 
-  for (let i = currentCacheHeight + 1; i < deltaEqualHeight - config.consensus.lastBlocksValidateAmount; i++)
+  for (let i = currentCacheHeight + 1; i < currentNodeHeight - config.consensus.lastBlocksValidateAmount; i++)
     missedBlocks.push(i);
 
   missedBuckets = _.chain(missedBlocks).reverse().chunk(10000).value();
 
-  if (deltaEqualHeight === -1)
+  if (currentNodeHeight === -1)
     return Promise.reject({code: 0});
 
-  return {missedBuckets: missedBuckets, height: deltaEqualHeight};
+  return {missedBuckets: missedBuckets, height: currentNodeHeight - config.consensus.lastBlocksValidateAmount < 0 ? 0 : currentNodeHeight - config.consensus.lastBlocksValidateAmount};
 
 };

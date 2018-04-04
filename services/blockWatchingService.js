@@ -3,8 +3,10 @@ const config = require('../config'),
   _ = require('lodash'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
+  addBlock = require('../utils/addBlock'),
   blockModel = require('../models/blockModel'),
-  web3Errors = require('web3/lib/web3/errors'),
+  txModel = require('../models/txModel'),
+  getBlock = require('../utils/getBlock'),
   log = bunyan.createLogger({name: 'app.services.blockCacheService'});
 
 /**
@@ -28,65 +30,47 @@ class BlockWatchingService {
     if (this.isSyncing)
       return;
 
-    this.web3 = await Promise.any(this.web3s.map(async (web3) => {
-      let height = await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => -1);
-      if (height === -1)
-        return await Promise.reject();
-
-      if (height === 0)
-        await Promise.delay(3000);
-
-      return web3;
-    }));
-
-    if ((await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(1000).catch(() => -1)) === -1)
-      return Promise.reject({code: 0});
-
     this.isSyncing = true;
 
-    const pendingBlock = await Promise.promisify(this.web3.eth.getBlock)('pending').timeout(10000);
-    if (!pendingBlock)
-      await blockModel.remove({number: -1});
+    const pendingBlock = await Promise.any(this.web3s.map(async (web3) => {
+      return await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
+    }));
 
-    const currentBlocks = await blockModel.find({
-      network: config.web3.network,
-      number: {$lte: this.currentHeight}
-    }).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
-    //this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
+    if (!pendingBlock)
+      await txModel.remove({blockNumber: -1});
+
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
-    this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
+    this.lastBlocks = [];
     this.doJob();
-    this.pendingFilter = this.web3.eth.filter('pending');
-    this.pendingFilter.watch((err, result) => this.UnconfirmedTxEvent(err, result));
+    this.pendingFilters = this.web3s.map(web3 =>
+      web3.eth.filter('pending')
+    );
+
+    this.pendingFilters.map((filter, index) =>
+      filter.watch((err, result) => this.UnconfirmedTxEvent(err, result, this.web3s[index]))
+    );
+
   }
 
   async doJob () {
     while (this.isSyncing)
       try {
-        let block = await this.processBlock();
-        await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
-        await blockModel.update({number: -1}, {
-          $pull: {
-            transactions: {
-              hash: {
-                $in: block.transactions.map(tx => tx.hash)
-              }
-            }
-          }
-        });
+        const data = await this.processBlock();
+
+        await new Promise.promisify(addBlock.bind(null, data.block, data.unconfirmedBlock, 1))();
 
         this.currentHeight++;
         _.pullAt(this.lastBlocks, 0);
-        this.lastBlocks.push(block.hash);
-        this.events.emit('block', block);
+        this.lastBlocks.push(data.block.hash);
+        this.events.emit('block', data.block);
       } catch (err) {
 
         if (err instanceof Promise.TimeoutError && this.web3.isConnected())
           continue;
 
-        if (_.has(err, 'cause') && err.toString() === web3Errors.InvalidConnection('on IPC').toString()) {
-          await this.stopSync().catch(e => log.error(e));
-          return this.events.emit('error', {code: 3});
+        if (err instanceof Promise.AggregateError) {
+          log.error('all nodes are down or not synced!');
+          process.exit(0);
         }
 
         if (_.get(err, 'code') === 0) {
@@ -96,13 +80,14 @@ class BlockWatchingService {
         }
 
         if ([1, 11000].includes(_.get(err, 'code'))) {
-          let lastCheckpointBlock = await blockModel.findOne({hash: this.lastBlocks[0]});
-          log.info(`wrong sync state!, rollback to ${lastCheckpointBlock.number - 1} block`);
-          await blockModel.remove({hash: {$in: this.lastBlocks}});
-          const currentBlocks = await blockModel.find({network: config.web3.network}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
+          const currentBlocks = await blockModel.find({
+            network: config.node.network,
+            timestamp: {$ne: 0}
+          }).sort({number: -1}).limit(config.consensus.lastBlocksValidateAmount);
           this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).reverse().value();
-          this.currentHeight = lastCheckpointBlock.number;
+          this.currentHeight = _.get(currentBlocks, '0.number', 0);
           continue;
+
         }
 
         if (_.get(err, 'code') === 2) {
@@ -117,32 +102,19 @@ class BlockWatchingService {
 
   }
 
-  async UnconfirmedTxEvent (err, result) {
+  async UnconfirmedTxEvent (err, result, web3) {
 
-    if (err || !(await this.isSynced()))
+    if (err)
       return;
 
-    let tx = await Promise.promisify(this.web3.eth.getTransaction)(result);
+    let tx = await Promise.promisify(web3.eth.getTransaction)(result);
 
     if (!_.has(tx, 'hash'))
       return;
 
     tx.logs = [];
-
-    const block = await Promise.promisify(this.web3.eth.getBlock)('pending', true);
-    let currentUnconfirmedBlock = await blockModel.findOne({number: -1}) || new blockModel({
-      number: -1,
-      hash: null,
-      timestamp: 0,
-      txs: []
-    });
-
-    _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
-    await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']),
-      {upsert: true})
-      .catch(err => log.error(err));
+    await txModel.findOneAndUpdate({blockNumber: -1, hash: tx.hash}, tx, {upsert: true, setDefaultsOnInsert: true});
     this.events.emit('tx', tx);
-
   }
 
   async stopSync () {
@@ -154,51 +126,52 @@ class BlockWatchingService {
 
   async processBlock () {
 
-    let block = await Promise.promisify(this.web3.eth.getBlockNumber)().timeout(10000);
+    const blocks = await Promise.map(this.web3s, async (web3) => {
+      return await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => 0);
+    });
+
+    const block = _.max(blocks);
 
     if (block === this.currentHeight) //heads are equal
       return Promise.reject({code: 0});
 
     if (block === 0) {
-      let syncState = await Promise.promisify(this.web3.eth.getSyncing)().timeout(10000);
-      if (syncState.currentBlock !== 0)
+
+      const syncStates = await Promise.map(this.web3s, async (web3) => {
+        return await Promise.promisify(web3.eth.getSyncing)().timeout(5000).catch(() => null);
+      });
+
+      let syncState = _.find(syncStates, state => state.currentBlock !== 0);
+
+      if (syncState)
         return Promise.reject({code: 0});
     }
 
     if (block < this.currentHeight)
       return Promise.reject({code: 2}); //head has been blown off
 
-    const lastBlockHashes = await Promise.mapSeries(this.lastBlocks, async blockHash => await Promise.promisify(this.web3.eth.getBlock)(blockHash, false).timeout(10000));
+    const lastBlockHashes = await Promise.map(this.web3s, async (web3) => {
+      return await Promise.mapSeries(this.lastBlocks, async blockHash =>
+        await Promise.promisify(web3.eth.getBlock)(blockHash, false).timeout(10000)
+      ).catch(() => []);
+    });
 
-    if (_.compact(lastBlockHashes).length !== this.lastBlocks.length)
+    const isEqualLength = _.find(lastBlockHashes, item=> _.compact(item).length === this.lastBlocks.length);
+
+    if (!isEqualLength)
       return Promise.reject({code: 1}); //head has been blown off
 
     /**
      * Get raw block
      * @type {Object}
      */
-    let rawBlock = await Promise.promisify(this.web3.eth.getBlock)(this.currentHeight + 1, true).timeout(10000);
 
-    let logs = await new Promise((res, rej) =>
-      this.web3.eth.filter({fromBlock: this.currentHeight + 1, toBlock: this.currentHeight + 1})
-        .get((err, result) => err ? rej(err) : res(result))
-    ).timeout(10000);
+    return await Promise.any(this.web3s.map(async (web3) => {
+      const block = await getBlock(web3, this.currentHeight);
+      const unconfirmedBlock = await Promise.promisify(web3.eth.getBlock)('pending', false);
+      return {block: block, unconfirmedBlock: unconfirmedBlock};
+    }));
 
-    rawBlock.transactions = rawBlock.transactions.map(tx => {
-      tx.logs = _.chain(logs)
-        .filter({transactionHash: tx.hash})
-        .map(item => _.omit(item, ['transactionHash', 'transactionIndex', 'blockHash', 'blockNumber']))
-        .value();
-      return tx;
-    });
-
-    rawBlock.network = config.web3.network;
-    return rawBlock;
-  }
-
-  async isSynced () {
-    const height = await Promise.promisify(this.web3.eth.getBlockNumber)();
-    return this.currentHeight >= height - config.consensus.lastBlocksValidateAmount;
   }
 
 }
