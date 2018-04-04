@@ -18,14 +18,17 @@ class BlockCacheService {
   /**
    * Creates an instance of BlockCacheService.
    * @param {Web3Service} web3Service 
+   * @param {MasterNode} masterNode
    * 
    * @memberOf BlockCacheService
   
    * 
    */
-  constructor (web3Service) {
+  constructor (web3Service, masterNode) {
     this.web3Service = web3Service;
     this.events = new EventEmitter();
+
+    this.masterNode = masterNode;
     this.currentHeight = 0;
     this.lastBlocks = [];
     this.isSyncing = false;
@@ -40,21 +43,34 @@ class BlockCacheService {
     this.isSyncing = true;
 
     const pendingBlock = await this.web3Service.getBlockPending();
-    if (!pendingBlock)
+    if (!pendingBlock && this.masterNode.isSyncMaster())
       await blockModel.remove({number: -1});
 
-    const currentBlocks = await blockModel.find({network: this.web3Service.getNetwork()}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
-    this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
-    log.info(`caching from block:${this.currentHeight} for network:${this.web3Service.getNetwork()}`);
-    this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
+    this.reinitCurrentHeight();
     await this.doJob();
 
     this.web3Service.startWatching();
     this.web3Service.events.on('pending', this.pendingTxCallback);
   }
 
+  async reinitCurrentHeight () {
+    const currentBlocks = await blockModel.find({network: this.web3Service.getNetwork()}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
+    this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
+    log.info(`caching from block:${this.currentHeight} for network:${this.web3Service.getNetwork()}`);
+    this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
+ 
+  }
+
   async doJob () {
-    while (this.isSyncing) 
+    while (this.isSyncing) {
+
+      if (!this.masterNode.isSynced) {
+        this.reinitCurrentHeight();
+        await Promise.delay(10000);
+        continue;
+      }
+
+
       try {
         let block = await this.processBlock();
         await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
@@ -94,10 +110,13 @@ class BlockCacheService {
           this.currentHeight = lastCheckpointBlock - 1;
         }
       }
+    }
     
   }
 
   async UnconfirmedTxEvent (err, txHash) {
+    if (!this.masterNode.isSyncMaster())
+      return;
 
     if (err)
       return;
@@ -113,7 +132,7 @@ class BlockCacheService {
     _.merge(currentUnconfirmedBlock, {transactions: _.get(block, 'transactions', [])});
     await blockModel.findOneAndUpdate({number: -1}, _.omit(currentUnconfirmedBlock.toObject(), ['_id', '__v']),
       {upsert: true})
-      .catch(console.error);
+      .catch(log.error);
     this.events.emit('pending', txHash);
   }
 
