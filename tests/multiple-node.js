@@ -11,6 +11,12 @@ describe('multiple node blocks test', function () {
   let childs = [];
   let channel;
 
+  async function start() {
+    const server = await new ConsumerServer();
+    childs.push(server);
+    await Promise.delay(1000);
+  }
+
   before(async () => {
 
     amqpInstance = await amqp.connect(config.rabbit.url);
@@ -31,12 +37,10 @@ describe('multiple node blocks test', function () {
 
   it('send three messages, 4 consumers and wait in rabbitmq only three messages', async () => {
 
-
-    childs.push(new ConsumerServer());
-    childs.push(new ConsumerServer());
-    childs.push(new ConsumerServer());
-    childs.push(new ConsumerServer());
-    
+    await start();
+    await start();
+    await start();
+    await start();
 
     await channel.assertExchange('super_events', 'direct', {autoDelete: true});
 
@@ -63,10 +67,10 @@ describe('multiple node blocks test', function () {
 
   it('send three messages, 3 consumers, kill master consumer and wait in rabbitmq  three messages', async () => {
 
-    childs.push(new ConsumerServer());
+    await start();
     await Promise.delay(4000);    
-    childs.push(new ConsumerServer());
-    childs.push(new ConsumerServer());
+    await start();
+    await start();
     
     await channel.assertExchange('super_events', 'direct', {autoDelete: true});
 
@@ -94,7 +98,7 @@ describe('multiple node blocks test', function () {
 
   it('send three messages, 1 consumer, kill consumer and run two 2 consumer and wait in rabbitmq  three messages', async () => {
 
-    childs.push(new ConsumerServer());
+    await start();
     await Promise.delay(4000);    
     
     await channel.assertExchange('super_events', 'direct', {autoDelete: true});
@@ -104,8 +108,7 @@ describe('multiple node blocks test', function () {
             await channel.publish('super_events', `super_sender`, new Buffer(1));
             await Promise.delay(4000);    
             childs[0].kill('SIGHUP');
-            childs.push(new ConsumerServer());
-            childs.push(new ConsumerServer());
+            await start();
             await Promise.delay(3000);
 
             await channel.publish('super_events', `super_sender`, new Buffer(2));

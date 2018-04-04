@@ -5,6 +5,7 @@ const path = require('path');
 class Runner {
     constructor() {
         this.child = spawn('node', [path.resolve(__dirname, 'consumer.js')],  {env: process.env});
+        console.log(this.child.pid);        
                 // cluster.setupMaster({
         //     exec: __dirname + '/scripts/testRpc.js',
         //     args: [],
