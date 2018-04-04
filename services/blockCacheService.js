@@ -47,6 +47,8 @@ class BlockCacheService {
       await blockModel.remove({number: -1});
 
     this.reinitCurrentHeight();
+    log.info(`caching from block:${this.currentHeight} for network:${this.web3Service.getNetwork()}`);
+    
     await this.doJob();
 
     this.web3Service.startWatching();
@@ -56,7 +58,6 @@ class BlockCacheService {
   async reinitCurrentHeight () {
     const currentBlocks = await blockModel.find({network: this.web3Service.getNetwork()}).sort('-number').limit(config.consensus.lastBlocksValidateAmount);
     this.currentHeight = _.chain(currentBlocks).get('0.number', -1).value();
-    log.info(`caching from block:${this.currentHeight} for network:${this.web3Service.getNetwork()}`);
     this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).compact().reverse().value();
  
   }
@@ -64,7 +65,7 @@ class BlockCacheService {
   async doJob () {
     while (this.isSyncing) {
 
-      if (!this.masterNode.isSynced) {
+      if (!this.masterNode.isSyncMaster()) {
         this.reinitCurrentHeight();
         await Promise.delay(10000);
         continue;

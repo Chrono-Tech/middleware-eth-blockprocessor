@@ -17,7 +17,7 @@ const _ = require('lodash'),
   bunyan = require('bunyan'),
   amqp = require('amqplib'),
   log = bunyan.createLogger({name: 'app'}),
-  MasterNode = require('../services/MasterNode'),
+  MasterNode = require('./services/MasterNode'),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
 
 [mongoose.accounts, mongoose.connection].forEach(connection =>
@@ -36,10 +36,7 @@ const init = async () => {
   });
 
   
-  const masterNode = new MasterNode(channel, log.info);
-  await masterNode.start();
-  
-  const blockCacheService = new BlockCacheService(web3Service, masterNode);
+
 
 
 
@@ -58,6 +55,11 @@ const init = async () => {
 
 
   await channel.assertExchange('events', 'topic', {durable: false});
+
+  const masterNode = new MasterNode(channel, (msg) => log.info(msg));
+  await masterNode.start();
+
+  const blockCacheService = new BlockCacheService(web3Service, masterNode);
 
   blockCacheService.events.on('block', async block => {
     if (!await masterNode.isSyncMaster())
