@@ -5,6 +5,7 @@
 
 const mongoose = require('mongoose'),
   config = require('./config'),
+  MasterNodeService = require('./services/MasterNodeService'),
   Promise = require('bluebird');
 
 mongoose.Promise = Promise;
@@ -67,6 +68,10 @@ const init = async () => {
   });
 
   await channel.assertExchange('events', 'topic', {durable: false});
+
+
+  const masterNodeService = new MasterNodeService(channel, (msg) => log.info(msg));
+  await masterNodeService.start();
 
   const syncCacheService = new SyncCacheService(web3s);
 
