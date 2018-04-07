@@ -1,10 +1,18 @@
+/**
+ * Copyright 2017–2018, LaborX PTY
+ * Licensed under the AGPL Version 3 license.
+ * @author Egor Zuev <zyev.egor@gmail.com>
+ */
+
 const bunyan = require('bunyan'),
   _ = require('lodash'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   allocateBlockBuckets = require('../utils/allocateBlockBuckets'),
   blockModel = require('../models/blockModel'),
+  txModel = require('../models/txModel'),
   getBlock = require('../utils/getBlock'),
+  addBlock = require('../utils/addBlock'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
 
 /**
@@ -29,76 +37,68 @@ class SyncCacheService {
     return data.height;
   }
 
-  async doJob (buckets) {
-
-    while (this.isSyncing) 
-      try {
-        let locker = {stack: {}, lock: false};
-
-        while (buckets.length) 
-          await Promise.map(this.web3s, async (web3, index) => {
-            return await this.runPeer(web3, buckets, locker, index);
-          });
-        
-
-        this.isSyncing = false;
-        this.events.emit('end');
-
-      } catch (err) {
-        log.error(err);
-      }
-    
-  }
-
-
   async indexCollection () {
     log.info('indexing...');
     await blockModel.init();
+    await txModel.init();
     log.info('indexation completed!');
   }
 
-  async runPeer (web3, buckets, locker, index) {
+  async doJob (buckets) {
 
-    while (buckets.length) {
-      if (locker.lock) {
-        await Promise.delay(1000);
-        continue;
+    while (buckets.length)
+      try {
+        for (let bucket of buckets) {
+          await this.runPeer(bucket);
+          if (!bucket.length)
+            _.pull(buckets, bucket);
+        }
+
+        this.events.emit('end');
+
+      } catch (err) {
+        if (err instanceof Promise.AggregateError) {
+          log.error('all nodes are down or not synced!');
+          process.exit(0);
+        }
+
+        log.error(err);
+
       }
+    this.events.emit('end');
 
-      locker.lock = true;
-      let lockerChunks = _.values(locker.stack);
-      let newChunkToLock = _.chain(buckets).reject(item =>
-        _.find(lockerChunks, lock => lock[0] === item[0])
-      ).head().value();
+  }
 
-      let lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(newChunkToLock), true).timeout(1000).catch(() => null);
-      locker.lock = false;
+  async runPeer (bucket) {
 
-      if (!newChunkToLock || !lastBlock) {
-        delete locker.stack[index];
-        await Promise.delay(10000);
-        continue;
-      }
+    let lastBlock = await Promise.any(this.web3s.map(async (web3) => {
+      const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(bucket), false).timeout(1000);
 
-      log.info(`web3 provider ${index} took chuck of blocks ${newChunkToLock[0]} - ${_.last(newChunkToLock)}`);
-      locker.stack[index] = newChunkToLock;
-      await Promise.mapSeries(newChunkToLock, async (blockNumber) => {
-        let block = await getBlock(web3, blockNumber);
-        await blockModel.findOneAndUpdate({number: block.number}, block, {upsert: true});
-        _.pull(newChunkToLock, blockNumber);
-        this.events.emit('block', block);
-      }).catch((e) => {
-        if (e && e.code === 11000) 
-          _.pull(newChunkToLock, newChunkToLock[0]);
-        
-      });
+      if (!_.get(lastBlock, 'number'))
+        return Promise.reject();
 
-      if (!newChunkToLock.length)
-        _.pull(buckets, newChunkToLock);
+      return lastBlock.number;
+    }));
 
-      delete locker.stack[index];
+    if (!lastBlock)
+      return await Promise.delay(10000);
 
-    }
+    log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
+    await Promise.map(bucket, async (blockNumber) => {
+      const data = await Promise.any(this.web3s.map(async (web3) => {
+        const block = await getBlock(web3, blockNumber);
+        const unconfirmedBlock = await Promise.promisify(web3.eth.getBlock)('pending', false);
+        return {block: block, unconfirmedBlock: unconfirmedBlock};
+      }));
+
+      await addBlock(data.block, data.unconfirmedBlock, 0);
+      _.pull(bucket, blockNumber);
+      this.events.emit('block', data.block);
+    }, {concurrency: this.web3s.length}).catch((e) => {
+      if (e && e.code === 11000)
+        _.pull(bucket, bucket[0]);
+    });
+
   }
 }
 
