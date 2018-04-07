@@ -1,6 +1,7 @@
 /**
  * Copyright 2017–2018, LaborX PTY
  * Licensed under the AGPL Version 3 license.
+ * @author Egor Zuev <zyev.egor@gmail.com>
  */
 
 const bunyan = require('bunyan'),
@@ -72,7 +73,6 @@ class SyncCacheService {
 
     let lastBlock = await Promise.any(this.web3s.map(async (web3) => {
       const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(bucket), false).timeout(1000);
-      console.log('last block: ', lastBlock);
 
       if (!_.get(lastBlock, 'number'))
         return Promise.reject();

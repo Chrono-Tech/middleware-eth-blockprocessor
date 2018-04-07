@@ -20,8 +20,8 @@
     "test": "node ./node_modules/mocha/bin/mocha -t 90000 tests",
     "testrpc": "node ./ipcConverter.js"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "chronobank",
+  "license": "AGPL-3.0",
   "description": "",
   "devDependencies": {
     "babel-eslint": "^8.0.0",
