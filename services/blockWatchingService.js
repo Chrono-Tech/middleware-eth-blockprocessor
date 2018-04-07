@@ -1,3 +1,9 @@
+/**
+ * Copyright 2017–2018, LaborX PTY
+ * Licensed under the AGPL Version 3 license.
+ * @author Egor Zuev <zyev.egor@gmail.com>
+ */
+
 const config = require('../config'),
   bunyan = require('bunyan'),
   _ = require('lodash'),
@@ -57,7 +63,7 @@ class BlockWatchingService {
       try {
         const data = await this.processBlock();
 
-        await new Promise.promisify(addBlock.bind(null, data.block, data.unconfirmedBlock, 1))();
+        await addBlock(data.block, data.unconfirmedBlock, 1);
 
         this.currentHeight++;
         _.pullAt(this.lastBlocks, 0);
