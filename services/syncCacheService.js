@@ -1,3 +1,8 @@
+/**
+ * Copyright 2017–2018, LaborX PTY
+ * Licensed under the AGPL Version 3 license.
+ */
+
 const bunyan = require('bunyan'),
   _ = require('lodash'),
   Promise = require('bluebird'),
@@ -51,7 +56,7 @@ class SyncCacheService {
         this.events.emit('end');
 
       } catch (err) {
-        if(err instanceof Promise.AggregateError){
+        if (err instanceof Promise.AggregateError) {
           log.error('all nodes are down or not synced!');
           process.exit(0);
         }
@@ -67,6 +72,7 @@ class SyncCacheService {
 
     let lastBlock = await Promise.any(this.web3s.map(async (web3) => {
       const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(bucket), false).timeout(1000);
+      console.log('last block: ', lastBlock);
 
       if (!_.get(lastBlock, 'number'))
         return Promise.reject();
@@ -79,13 +85,13 @@ class SyncCacheService {
 
     log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
     await Promise.map(bucket, async (blockNumber) => {
-      const data = await Promise.any(this.web3s.map(async (web3)=>{
+      const data = await Promise.any(this.web3s.map(async (web3) => {
         const block = await getBlock(web3, blockNumber);
         const unconfirmedBlock = await Promise.promisify(web3.eth.getBlock)('pending', false);
         return {block: block, unconfirmedBlock: unconfirmedBlock};
       }));
 
-      await new Promise.promisify(addBlock.bind(null, data.block, data.unconfirmedBlock, 0))();
+      await addBlock(data.block, data.unconfirmedBlock, 0);
       _.pull(bucket, blockNumber);
       this.events.emit('block', data.block);
     }, {concurrency: this.web3s.length}).catch((e) => {

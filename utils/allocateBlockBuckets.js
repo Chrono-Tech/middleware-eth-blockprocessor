@@ -1,3 +1,8 @@
+/**
+ * Copyright 2017–2018, LaborX PTY
+ * Licensed under the AGPL Version 3 license.
+ */
+
 const _ = require('lodash'),
   config = require('../config'),
   bunyan = require('bunyan'),

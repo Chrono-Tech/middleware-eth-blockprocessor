@@ -1,3 +1,8 @@
+/**
+ * Copyright 2017–2018, LaborX PTY
+ * Licensed under the AGPL Version 3 license.
+ */
+
 const config = require('../config'),
   bunyan = require('bunyan'),
   log = bunyan.createLogger({name: 'app.services.MasterNodeService'}),
@@ -47,7 +52,6 @@ class MasterNode {
 
     this.channel = _channel;
     this._isMaster = false;
-    this._isMasterSynced = true;
     this._currentMaster = undefined;
   }
 
@@ -84,7 +88,6 @@ class MasterNode {
   }
 
   async _updateMaster () {
-    this._isMasterSynced = false;
     this._currentMaster = undefined;
     log.info(`master-node#${this._myid}: syncing: started`);
 
@@ -105,7 +108,6 @@ class MasterNode {
 
     log.info(`master-node#${this._myid}: syncing: finished`);
 
-    this._isMasterSynced = true;
   }
 
   /**

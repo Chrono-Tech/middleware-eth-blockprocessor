@@ -1,3 +1,8 @@
+/**
+ * Copyright 2017–2018, LaborX PTY
+ * Licensed under the AGPL Version 3 license.
+ */
+
 const config = require('../config'),
   bunyan = require('bunyan'),
   _ = require('lodash'),
@@ -13,30 +18,34 @@ const config = require('../config'),
  * @returns {Promise.<*>}
  */
 
-const addBlock = async (block, pendingBlock, type, callback) => {
+const addBlock = async (block, pendingBlock, type) => {
 
-  sem.take(async () => {
-    try {
+  return new Promise((res, rej) => {
 
-      await updateDbStateWithBlock(block, pendingBlock);
-      callback();
-    } catch (err) {
-      if (type === 1 && [1, 11000].includes(_.get(err, 'code'))) {
-        let lastCheckpointBlock = await blockModel.findOne({
-          number: {
-            $lte: block.number - 1,
-            $gte: block.number - 1 + config.consensus.lastBlocksValidateAmount
-          }
-        }).sort({number: -1});
-        log.info(`wrong sync state!, rollback to ${lastCheckpointBlock.number - 1} block`);
-        await rollbackStateFromBlock(lastCheckpointBlock);
+    sem.take(async () => {
+      try {
+
+        await updateDbStateWithBlock(block, pendingBlock);
+        res();
+      } catch (err) {
+        if (type === 1 && [1, 11000].includes(_.get(err, 'code'))) {
+          let lastCheckpointBlock = await blockModel.findOne({
+            number: {
+              $lte: block.number - 1,
+              $gte: block.number - 1 + config.consensus.lastBlocksValidateAmount
+            }
+          }).sort({number: -1});
+          log.info(`wrong sync state!, rollback to ${lastCheckpointBlock.number - 1} block`);
+          await rollbackStateFromBlock(lastCheckpointBlock);
+        }
+
+        rej(err);
+
       }
 
-      callback(err, null);
+      sem.leave();
+    });
 
-    }
-
-    sem.leave();
   });
 
 };
@@ -46,7 +55,7 @@ const updateDbStateWithBlock = async (block, pendingBlock) => {
   await txModel.remove({
     $or: [
       {hash: {$in: block.transactions.map(tx => tx.hash)}},
-      {number: -1, hash: {$nin: _.get(pendingBlock, 'transactions', [])}}
+      {blockNumber: -1, hash: {$nin: _.get(pendingBlock, 'transactions', [])}}
     ]
   });
 
