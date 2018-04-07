@@ -12,6 +12,7 @@
     "mongoose-long": "^0.1.1",
     "require-all": "^2.2.0",
     "semaphore": "^1.1.0",
+    "uniqid": "^4.1.1",
     "web3": "^0.19.0"
   },
   "scripts": {
@@ -19,8 +20,8 @@
     "test": "node ./node_modules/mocha/bin/mocha -t 90000 tests",
     "testrpc": "node ./ipcConverter.js"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "chronobank",
+  "license": "AGPL-3.0",
   "description": "",
   "devDependencies": {
     "babel-eslint": "^8.0.0",

@@ -1,10 +1,16 @@
 /**
+ * Copyright 2017–2018, LaborX PTY
+ * Licensed under the AGPL Version 3 license.
+ */
+
+/**
  * Middleware service for handling emitted events on chronobank platform
  * @module Chronobank/eth-blockprocessor
  */
 
 const mongoose = require('mongoose'),
   config = require('./config'),
+  MasterNodeService = require('./services/MasterNodeService'),
   Promise = require('bluebird');
 
 mongoose.Promise = Promise;
@@ -67,6 +73,10 @@ const init = async () => {
   });
 
   await channel.assertExchange('events', 'topic', {durable: false});
+
+
+  const masterNodeService = new MasterNodeService(channel, (msg) => log.info(msg));
+  await masterNodeService.start();
 
   const syncCacheService = new SyncCacheService(web3s);
 
