@@ -60,7 +60,7 @@ class MasterNode {
   }
 
   async _onFindMasterEvent () {
-    await this.channel.assertQueue(this._queues.findMasterQueue);
+    await this.channel.assertQueue(this._queues.findMasterQueue, {autoDelete: true});
     await this.channel.bindQueue(this._queues.findMasterQueue, EXCHANGE_NAME, this._queues.findMasterRoute, {autoDelete: true});
 
     this.channel.consume(this._queues.findMasterQueue, async (message) => {
@@ -72,7 +72,7 @@ class MasterNode {
   }
 
   async _onSetMasterEvent () {
-    await this.channel.assertQueue(this._queues.setMasterQueue);
+    await this.channel.assertQueue(this._queues.setMasterQueue, {autoDelete: true});
     await this.channel.bindQueue(this._queues.setMasterQueue, EXCHANGE_NAME, this._queues.setMasterRoute, {autoDelete: true});
 
     this.channel.consume(this._queues.setMasterQueue, async (message) => {
