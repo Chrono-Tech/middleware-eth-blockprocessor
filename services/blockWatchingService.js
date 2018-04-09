@@ -80,14 +80,14 @@ class BlockWatchingService {
         }
 
         if (_.get(err, 'code') === 0) {
-          log.info(`await for next block ${this.currentHeight + 1}`);
+          log.info(`await for next block ${this.currentHeight}`);
           await Promise.delay(10000);
           continue;
         }
 
         if ([1, 11000].includes(_.get(err, 'code'))) {
           const currentBlocks = await blockModel.find({
-            network: config.node.network,
+            network: config.web3.network,
             timestamp: {$ne: 0}
           }).sort({number: -1}).limit(config.consensus.lastBlocksValidateAmount);
           this.lastBlocks = _.chain(currentBlocks).map(block => block.hash).reverse().value();
@@ -119,8 +119,15 @@ class BlockWatchingService {
       return;
 
     tx.logs = [];
-    await txModel.findOneAndUpdate({blockNumber: -1, hash: tx.hash}, tx, {upsert: true, setDefaultsOnInsert: true});
-    this.events.emit('tx', tx);
+    try {
+      await txModel.findOneAndUpdate({blockNumber: -1, hash: tx.hash}, tx, {upsert: true, setDefaultsOnInsert: true});
+      this.events.emit('tx', tx);
+    } catch (err) {
+      if (_.get(err, 'code') === 11000)
+        return;
+
+      log.error(err);
+    }
   }
 
   async stopSync () {
@@ -138,7 +145,7 @@ class BlockWatchingService {
 
     const block = _.max(blocks);
 
-    if (block === this.currentHeight) //heads are equal
+    if (block === this.currentHeight - 1) //heads are equal
       return Promise.reject({code: 0});
 
     if (block === 0) {
@@ -162,7 +169,7 @@ class BlockWatchingService {
       ).catch(() => []);
     });
 
-    const isEqualLength = _.find(lastBlockHashes, item=> _.compact(item).length === this.lastBlocks.length);
+    const isEqualLength = _.find(lastBlockHashes, item => _.compact(item).length === this.lastBlocks.length);
 
     if (!isEqualLength)
       return Promise.reject({code: 1}); //head has been blown off
