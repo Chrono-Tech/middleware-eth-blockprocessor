@@ -16,7 +16,7 @@ const net = require('net'),
   path = require('path'),
   _ = require('lodash'),
   log = bunyan.createLogger({name: 'ipcConverter'}),
-  TestRPC = require('ethereumjs-testrpc');
+  TestRPC = require('ganache-cli');
 
 let RPCServer = TestRPC.server();
 RPCServer.listen(8545);
@@ -36,23 +36,14 @@ console.log(addresses);
 // create RPC server
 const server = net.createServer(stream => {
   stream.on('data', c => {
-    let stringMsg;
     try {
-      stringMsg = c.toString()
-        .replace(/}\[{/g, '}{')
-        .replace(/}\]{/g, '}{')
-        .replace(/}\]\[{/g, '}{')
-        .replace(/}{/g, '},{');
-      JSON.parse('[' + stringMsg + ']').forEach((string) => {
-        RPCServer.provider.sendAsync(string, (err, data) => {
-          stream.cork();
-          stream.write(JSON.stringify(err || data));
-          process.nextTick(() => stream.uncork());
-        });
+      const stringMsg = c.toString();
+      RPCServer.provider.sendAsync(JSON.parse(stringMsg), (err, data) => {
+        stream.cork();
+        stream.write(JSON.stringify(err || data));
+        process.nextTick(() => stream.uncork());
       });
     } catch (e) {
-      log.error(stringMsg);
-      log.error(e);
       stream.write(JSON.stringify({
         message: e,
         code: -32000
