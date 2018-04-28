@@ -52,15 +52,16 @@ const addBlock = async (block, pendingBlock, type) => {
 };
 
 const updateDbStateWithBlock = async (block, pendingBlock) => {
-
+  const txHashes = block.transactions.map(tx => tx.hash);
   await txModel.remove({
     $or: [
-      {hash: {$in: block.transactions.map(tx => tx.hash)}},
+      {hash: {$in: txHashes}},
       {blockNumber: -1, hash: {$nin: _.get(pendingBlock, 'transactions', [])}}
     ]
   });
 
   await txModel.insertMany(block.transactions);
+  block.txs = txHashes;
   await blockModel.update({number: block.number}, block, {upsert: true});
 
 };
