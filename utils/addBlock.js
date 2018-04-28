@@ -67,12 +67,9 @@ const updateDbStateWithBlock = async (block, pendingBlock) => {
 
 const rollbackStateFromBlock = async (block) => {
 
-  await txModel.remove({blockNumber: {$gte: block.number}});
+  await txModel.remove({blockNumber: {$gte: block.number - config.consensus.lastBlocksValidateAmount}});
   await blockModel.remove({
-    $or: [
-      {hash: {$lte: block.number, $gte: block.number - config.consensus.lastBlocksValidateAmount}},
-      {number: {$gte: block.number}}
-    ]
+    number: {$gte: block.number - config.consensus.lastBlocksValidateAmount}
   });
 };
 
