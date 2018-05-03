@@ -35,6 +35,5 @@ module.exports = async (web3, blockNumber) => {
     return tx;
   });
 
-  rawBlock.network = config.web3.network;
   return rawBlock;
 };
