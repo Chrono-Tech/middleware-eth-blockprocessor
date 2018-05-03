@@ -14,12 +14,12 @@ module.exports = async (web3, blockNumber) => {
    * Get raw block
    * @type {Object}
    */
-  let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(1000);
+  let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(60000);
 
   let logs = await new Promise((res, rej) =>
     web3.eth.filter({fromBlock: blockNumber, toBlock: blockNumber})
       .get((err, result) => err ? rej(err) : res(result))
-  ).timeout(1000);
+  ).timeout(60000);
 
   rawBlock.transactions = rawBlock.transactions.map(tx => {
     tx.timestamp = rawBlock.timestamp;
