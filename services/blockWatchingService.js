@@ -150,10 +150,10 @@ class BlockWatchingService {
     if (block === 0) {
 
       const syncStates = await Promise.map(this.web3s, async (web3) => {
-        return await Promise.promisify(web3.eth.getSyncing)().timeout(5000).catch(() => null);
+        return await Promise.promisify(web3.eth.getSyncing)().timeout(60000).catch(() => null);
       });
 
-      let syncState = _.find(syncStates, state => state.currentBlock !== 0);
+      let syncState = _.find(syncStates, state => _.get(state, 'currentBlock') !== 0);
 
       if (syncState)
         return Promise.reject({code: 0});
@@ -164,7 +164,7 @@ class BlockWatchingService {
 
     const lastBlockHashes = await Promise.map(this.web3s, async (web3) => {
       return await Promise.mapSeries(this.lastBlocks, async blockHash =>
-        await Promise.promisify(web3.eth.getBlock)(blockHash, false).timeout(10000)
+        await Promise.promisify(web3.eth.getBlock)(blockHash, false).timeout(60000)
       ).catch(() => []);
     });
 

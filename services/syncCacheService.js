@@ -59,6 +59,7 @@ class SyncCacheService {
       } catch (err) {
 
         if (err instanceof Promise.AggregateError) {
+          console.log(err);
           log.error('all nodes are down or not synced!');
           process.exit(0);
         }
@@ -73,7 +74,7 @@ class SyncCacheService {
   async runPeer (bucket) {
 
     let lastBlock = await Promise.any(this.web3s.map(async (web3) => {
-      const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.head(bucket), false).timeout(1000);
+      const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.head(bucket), false).timeout(60000);
 
       if (!_.has(lastBlock, 'number'))
         return Promise.reject();
@@ -85,7 +86,12 @@ class SyncCacheService {
       return await Promise.delay(10000);
 
     log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
-    await Promise.map(bucket, async (blockNumber) => {
+
+    let blocksToProcess = [];
+    for(let blockNumber = bucket[0]; blockNumber <= _.last(bucket); blockNumber++)
+      blocksToProcess.push(blockNumber);
+
+    await Promise.map(blocksToProcess, async (blockNumber) => {
       const data = await Promise.any(this.web3s.map(async (web3) => {
         const block = await getBlock(web3, blockNumber);
         const unconfirmedBlock = await Promise.promisify(web3.eth.getBlock)('pending', false);

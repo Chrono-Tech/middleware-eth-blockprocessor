@@ -16,10 +16,23 @@ const net = require('net'),
   path = require('path'),
   _ = require('lodash'),
   log = bunyan.createLogger({name: 'ipcConverter'}),
+  dbPath = path.join(__dirname, 'testrpc_db'),
   TestRPC = require('ganache-cli');
 
-let RPCServer = TestRPC.server();
-RPCServer.listen(8545);
+const accounts = [
+  '6b9027372deb53f4ae973a5614d8a57024adf33126ece6b587d9e08ba901c0d2',
+  '993130d3dd4de71254a94a47fdacb1c9f90dd33be8ad06b687bd95f073514a97',
+  'c3ea2286b88b51e7cd1cf09ce88b65e9c344302778f96a145c9a01d203f80a4c',
+  '51cd20e24463a0e86c540f074a5f083c334659353eec43bb0bd9297b5929bd35',
+  '7af5f0d70d97f282dfd20a9b611a2e4bd40572c038a89c0ee171a3c93bd6a17a',
+  'cfc6d3fa2b579e3023ff0085b09d7a1cf13f6b6c995199454b739d24f2cf23a5'
+].map(privKey => ({secretKey: Buffer.from(privKey, 'hex'), balance: Math.pow(10, 32).toString(16)}));
+
+if (!fs.existsSync(dbPath))
+  fs.mkdirSync(dbPath);
+
+let RPCServer = TestRPC.server({accounts: accounts, default_balance_ether: 1000, db_path: dbPath, network_id: 86});
+RPCServer.listen(parseInt(process.env.RPC_PORT || 8545));
 const web3ProviderUri = `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${config.web3.providers[0]}`;
 
 let addresses = _.chain(RPCServer.provider.manager.state.accounts)
