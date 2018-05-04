@@ -74,7 +74,7 @@ class SyncCacheService {
   async runPeer (bucket) {
 
     let lastBlock = await Promise.any(this.web3s.map(async (web3) => {
-      const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.head(bucket), false).timeout(60000);
+      const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(bucket), false).timeout(60000);
 
       if (!_.has(lastBlock, 'number'))
         return Promise.reject();

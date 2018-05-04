@@ -4,8 +4,7 @@
  * @author Egor Zuev <zyev.egor@gmail.com>
  */
 
-const config = require('../config'),
-  Promise = require('bluebird'),
+const Promise = require('bluebird'),
   _ = require('lodash');
 
 module.exports = async (web3, blockNumber) => {
