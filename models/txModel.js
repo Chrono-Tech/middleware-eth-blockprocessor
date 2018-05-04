@@ -33,7 +33,6 @@ const TX = new mongoose.Schema({
     topics: {type: Array, default: []},
     address: {type: String, index: true}
   }],
-  network: {type: String, index: true},
   created: {type: Date, required: true, default: Date.now}
 });
 
