@@ -9,7 +9,7 @@ const _ = require('lodash'),
   bunyan = require('bunyan'),
   Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app.utils.allocateBlockBuckets'}),
-  blockModel = require('../models/blockModel');
+  blockModel = require('../models').models.blockModel;
 
 const blockValidator = async (minBlock, maxBlock, chunkSize) => {
 
@@ -25,12 +25,14 @@ const blockValidator = async (minBlock, maxBlock, chunkSize) => {
       const minBlock = _.head(chunk);
       const maxBlock = _.last(chunk);
       log.info(`validating blocks from: ${minBlock} to ${maxBlock}`);
-      const count = await blockModel.count({
-        number: minBlock === maxBlock ? minBlock : {
-          $gte: minBlock,
-          $lt: maxBlock
-        }
+
+      const count = await blockModel.count(minBlock === maxBlock ? {number: minBlock} : {
+        and: [
+          {number: {gte: minBlock}},
+          {number: {lt: maxBlock}}
+        ]
       });
+
 
       if (maxBlock !== minBlock && count !== maxBlock - minBlock && count)
         await calculate(minBlock, maxBlock, chunkSize / 10);

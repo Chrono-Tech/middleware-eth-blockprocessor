@@ -8,16 +8,11 @@
  * @module Chronobank/eth-blockprocessor
  */
 
-const mongoose = require('mongoose'),
+const models = require('./models'),
   config = require('./config'),
   MasterNodeService = require('./services/MasterNodeService'),
-  Promise = require('bluebird');
-
-mongoose.Promise = Promise;
-mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
-mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri, {useMongoClient: true});
-
-const _ = require('lodash'),
+  Promise = require('bluebird'),
+  _ = require('lodash'),
   BlockWatchingService = require('./services/blockWatchingService'),
   SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
@@ -27,14 +22,16 @@ const _ = require('lodash'),
   log = bunyan.createLogger({name: 'app'}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
 
-[mongoose.accounts, mongoose.connection].forEach(connection =>
+/*[mongoose.accounts, mongoose.connection].forEach(connection =>
   connection.on('disconnected', function () {
     log.error('mongo disconnected!');
     process.exit(0);
   })
-);
+);*/
 
 const init = async () => {
+
+  await models.init();
 
   const web3s = config.web3.providers.map((providerURI) => {
     const provider = /^http/.test(providerURI) ?
@@ -74,9 +71,9 @@ const init = async () => {
 
   await channel.assertExchange('events', 'topic', {durable: false});
 
-
   const masterNodeService = new MasterNodeService(channel, (msg) => log.info(msg));
   await masterNodeService.start();
+
 
   const syncCacheService = new SyncCacheService(web3s);
 
@@ -129,6 +126,8 @@ const init = async () => {
       res();
     });
   });
+
+  return;
 
   let blockWatchingService = new BlockWatchingService(web3s, endBlock);
 

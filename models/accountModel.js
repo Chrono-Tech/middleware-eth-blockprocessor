@@ -11,23 +11,15 @@
  * @requires factories/addressMessageFactory
  */
 
-const mongoose = require('mongoose'),
-  config = require('../config'),
-  messages = require('../factories/messages/addressMessageFactory');
+const config = require('../config');
 
-require('mongoose-long')(mongoose);
+module.exports = (ds) => {
+  return ds.accounts.define(`${config.storage.accounts.collectionPrefix}Account`, {
+    address: {type: String, unique: true, required: true},
+    balance: {type: Number, default: 0},
+    isActive: {type: Boolean, required: true, default: true},
+    created: {type: Date, required: true, default: Date.now},
+    erc20token: {type: Object, default: {}}
+  });
 
-const Account = new mongoose.Schema({
-  address: {
-    type: String,
-    unique: true,
-    required: true,
-    validate: [a=>  /^(0x)?[0-9a-fA-F]{40}$/.test(a), messages.wrongAddress]
-  },
-  balance: {type: mongoose.Schema.Types.Long, default: 0},
-  isActive: {type: Boolean, required: true, default: true},
-  created: {type: Date, required: true, default: Date.now},
-  erc20token : {type: mongoose.Schema.Types.Mixed, default: {}}
-});
-
-module.exports = mongoose.accounts.model(`${config.mongo.accounts.collectionPrefix}Account`, Account);
+};

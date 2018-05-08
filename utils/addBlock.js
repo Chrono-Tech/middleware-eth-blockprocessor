@@ -8,8 +8,9 @@ const config = require('../config'),
   bunyan = require('bunyan'),
   _ = require('lodash'),
   sem = require('semaphore')(config.web3.providers.length + 1),
-  blockModel = require('../models/blockModel'),
-  txModel = require('../models/txModel'),
+  blockModel = require('../models').models.blockModel,
+  txModel = require('../models').models.txModel,
+  txLogsModel = require('../models').models.txLogsModel,
   log = bunyan.createLogger({name: 'app.services.addBlock'});
 
 /**
@@ -52,24 +53,61 @@ const addBlock = async (block, pendingBlock, type) => {
 };
 
 const updateDbStateWithBlock = async (block, pendingBlock) => {
-  const txHashes = block.transactions.map(tx => tx.hash);
-  await txModel.remove({
-    $or: [
-      {hash: {$in: txHashes}},
-      {blockNumber: -1, hash: {$nin: _.get(pendingBlock, 'transactions', [])}}
-    ]
-  });
 
-  await txModel.insertMany(block.transactions);
-  block.txs = txHashes;
-  await blockModel.update({number: block.number}, block, {upsert: true});
+  const txHashes = _.chain(block.transactions)
+    .map(tx => tx.hash)
+    .value();
+
+  const pendingTxHashes = _.get(pendingBlock, 'transactions', []);
+
+  if (pendingTxHashes.length)
+    await txModel.destroyAll({blockNumber: -1, hash: {nin: pendingTxHashes}});
+
+  const transactions = block.transactions.map(tx => ({
+    blockNumber: tx.blockNumber,
+    timestamp: tx.timestamp,
+    value: tx.value,
+    transactionIndex: tx.transactionIndex,
+    to: tx.to,
+    nonce: tx.nonce,
+    hash: tx.hash,
+    gasPrice: tx.gasPrice,
+    gas: tx.gas,
+    from: tx.from,
+    created: tx.created,
+    blockId: block.number
+  }));
+
+  if (txHashes.length)
+    await txModel.destroyAll({hash: {inq: txHashes}});
+
+  const savedTxs = await txModel.create(transactions);
+  const logs = _.chain(block.transactions).map((tx, index) =>
+    tx.logs.map(log => savedTxs[index].txlogs.build({
+      txHash: tx.hash,
+      signature: log.topics[0],
+      address: log.address,
+      topics: log.topics,
+      data: log.data,
+      logIndex: log.logIndex
+    }))
+  )
+    .flattenDeep()
+    .value();
+
+  await txLogsModel.destroyAll({txHash: {inq: txHashes}});
+  await txLogsModel.create(logs);
+
+  block = _.pick(block, ['number', 'hash', 'timestamp', 'created']);
+  block.id = block.number;
+  await blockModel.create(block);
 
 };
 
 const rollbackStateFromBlock = async (block) => {
 
-  await txModel.remove({blockNumber: {$gte: block.number - config.consensus.lastBlocksValidateAmount}});
-  await blockModel.remove({
+  await txModel.destroyAll({blockNumber: {$gte: block.number - config.consensus.lastBlocksValidateAmount}});
+  await blockModel.destroyAll({
     number: {$gte: block.number - config.consensus.lastBlocksValidateAmount}
   });
 };

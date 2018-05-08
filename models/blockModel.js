@@ -1,24 +1,18 @@
-/**
- * Copyright 2017–2018, LaborX PTY
- * Licensed under the AGPL Version 3 license.
- * @author Egor Zuev <zyev.egor@gmail.com>
- */
+const config = require('../config');
 
-/**
- * Mongoose model. Represents a block in eth
- * @module models/blockModel
- * @returns {Object} Mongoose model
- */
+module.exports = (ds) => {
+  return ds.data.define(`${config.storage.data.collectionPrefix}Block`, {
+    id: {type: Number, id: true, generated: false},
+    number: {type: Number},
+    hash: {type: String},
+    timestamp: {type: Number, required: true},
+    created: {type: Date, required: true, default: Date.now}
+  }, {
+    indexes: {
+      block_number_index: {number: 1},
+      block_hash_index: {hash: 1},
+      block_timestamp_index: {timestamp: 1}
+    }
+  });
 
-const mongoose = require('mongoose'),
-  config = require('../config');
-
-const Block = new mongoose.Schema({
-  number: {type: Number, unique: true, index: true},
-  hash: {type: String, unique: true, index: true},
-  timestamp: {type: Number, required: true, index: true},
-  txs: [{type: String}],
-  created: {type: Date, required: true, default: Date.now}
-});
-
-module.exports = mongoose.model(`${config.mongo.data.collectionPrefix}Block`, Block);
+};

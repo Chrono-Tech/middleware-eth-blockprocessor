@@ -10,7 +10,7 @@
  */
 
 const _ = require('lodash'),
-  accountModel = require('../models/accountModel');
+  accountModel = require('../models').models.accountModel;
 
 module.exports = async (txs) => {
 
@@ -18,11 +18,11 @@ module.exports = async (txs) => {
     return [];
 
   let query = {
-    isActive: {$ne: false},
-    $or: [
+    isActive: {neq: false},
+    or: [
       {
         address: {
-          $in: _.chain(txs)
+          inq: _.chain(txs)
             .map(tx =>
               _.union(tx.logs.map(log => log.address), [tx.to, tx.from])
             )
@@ -32,12 +32,12 @@ module.exports = async (txs) => {
         }
       },
       {
-        $or: _.chain(txs)
+        or: _.chain(txs)
           .map(tx =>
             _.chain([tx.to, tx.from])
               .transform((acc, val) => {
                 if (!val) return;
-                acc.push({[`erc20token.${val}`]: {$exists: true}});
+                acc.push({[`erc20token.${val}`]: {neq: null}});
               })
               .value()
           )

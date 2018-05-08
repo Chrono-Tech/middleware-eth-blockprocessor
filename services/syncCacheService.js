@@ -9,8 +9,6 @@ const bunyan = require('bunyan'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   allocateBlockBuckets = require('../utils/allocateBlockBuckets'),
-  blockModel = require('../models/blockModel'),
-  txModel = require('../models/txModel'),
   getBlock = require('../utils/getBlock'),
   addBlock = require('../utils/addBlock'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
@@ -31,17 +29,9 @@ class SyncCacheService {
   }
 
   async start () {
-    await this.indexCollection();
     let data = await allocateBlockBuckets(this.web3s);
     this.doJob(data.missedBuckets);
     return data.height;
-  }
-
-  async indexCollection () {
-    log.info('indexing...');
-    await blockModel.init();
-    await txModel.init();
-    log.info('indexation completed!');
   }
 
   async doJob (buckets) {
@@ -59,7 +49,6 @@ class SyncCacheService {
       } catch (err) {
 
         if (err instanceof Promise.AggregateError) {
-          console.log(err);
           log.error('all nodes are down or not synced!');
           process.exit(0);
         }
@@ -102,6 +91,8 @@ class SyncCacheService {
       _.pull(bucket, blockNumber);
       this.events.emit('block', data.block);
     }, {concurrency: this.web3s.length}).catch((e) => {
+      console.log(e);
+      process.exit(0);
       if (e && e.code === 11000)
         _.pull(bucket, bucket[0]);
     });
