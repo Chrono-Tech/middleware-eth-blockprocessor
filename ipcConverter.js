@@ -10,6 +10,8 @@
  */
 
 const net = require('net'),
+  Web3 = require('web3'),
+  web3 = new Web3(),
   config = require('./config'),
   bunyan = require('bunyan'),
   fs = require('fs'),
@@ -26,12 +28,12 @@ const accounts = [
   '51cd20e24463a0e86c540f074a5f083c334659353eec43bb0bd9297b5929bd35',
   '7af5f0d70d97f282dfd20a9b611a2e4bd40572c038a89c0ee171a3c93bd6a17a',
   'cfc6d3fa2b579e3023ff0085b09d7a1cf13f6b6c995199454b739d24f2cf23a5'
-].map(privKey => ({secretKey: Buffer.from(privKey, 'hex'), balance: Math.pow(10, 32).toString(16)}));
+].map(privKey => ({secretKey: Buffer.from(privKey, 'hex'), balance: web3.toWei(500, 'ether')}));
 
 if (!fs.existsSync(dbPath))
   fs.mkdirSync(dbPath);
 
-let RPCServer = TestRPC.server({accounts: accounts, default_balance_ether: 1000, db_path: dbPath, network_id: 86});
+let RPCServer = TestRPC.server({accounts: accounts, default_balance_ether: 500, db_path: dbPath, network_id: 86});
 RPCServer.listen(parseInt(process.env.RPC_PORT || 8545));
 const web3ProviderUri = `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${config.web3.providers[0]}`;
 
@@ -48,13 +50,15 @@ console.log(addresses);
 
 // create RPC server
 const server = net.createServer(stream => {
-  stream.on('data', c => {
+  stream.on('data', async c => {
     try {
       const stringMsg = c.toString();
       RPCServer.provider.sendAsync(JSON.parse(stringMsg), (err, data) => {
-        stream.cork();
-        stream.write(JSON.stringify(err || data));
-        process.nextTick(() => stream.uncork());
+        if(!stream.destroyed) {
+          stream.cork();
+          stream.write(JSON.stringify(err || data));
+          process.nextTick(() => stream.uncork());
+        }
       });
     } catch (e) {
       stream.write(JSON.stringify({
