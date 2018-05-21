@@ -25,7 +25,6 @@ module.exports = async (web3, blockNumber) => {
     tx.logs = _.chain(logs)
       .filter({transactionHash: tx.hash})
       .map(item => {
-        item = _.omit(item, ['transactionHash', 'transactionIndex', 'blockHash', 'blockNumber']);
         if (item.topics.length)
           item.signature = item.topics[0];
         return item;
