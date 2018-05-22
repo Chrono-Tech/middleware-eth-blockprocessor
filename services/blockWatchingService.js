@@ -66,7 +66,7 @@ class BlockWatchingService {
         const block = await this.processBlock();
         await addBlock(block, true);
         this.currentHeight++;
-        this.lastBlockHash = block._id;
+        this.lastBlockHash = block.hash;
         this.events.emit('block', block);
       } catch (err) {
 
@@ -85,11 +85,10 @@ class BlockWatchingService {
         }
 
         if (_.get(err, 'code') === 1) {
-          console.log(err)
           const currentBlock = await blockModel.find({
             number: {$gte: 0}
           }).sort({number: -1}).limit(2);
-          this.lastBlockHash = _.get(currentBlock, '1.hash');
+          this.lastBlockHash = _.get(currentBlock, '1._id');
           this.currentHeight = _.get(currentBlock, '0.number', 0);
 
           continue;
@@ -139,35 +138,22 @@ class BlockWatchingService {
 
     const block = _.max(blocks);
 
-    if (block === this.currentHeight - 1) //heads are equal
+    if (block === this.currentHeight - 1)
       return Promise.reject({code: 0});
-
-    if (block === 0) {
-
-      const syncStates = await Promise.map(this.web3s, async (web3) => {
-        return await Promise.promisify(web3.eth.getSyncing)().timeout(60000).catch(() => null);
-      });
-
-      let syncState = _.find(syncStates, state => _.get(state, 'currentBlock') !== 0);
-
-      if (syncState)
-        return Promise.reject({code: 0});
-    }
-
-    if (block < this.currentHeight)
-      return Promise.reject({code: 2}); //head has been blown off
 
     const lastBlock = this.currentHeight === 0 ? null : await Promise.any(this.web3s.map(async (web3) =>
       await Promise.promisify(web3.eth.getBlock)(this.currentHeight - 1, false).timeout(60000).catch(() => null)
     ));
 
-    if (!lastBlock && this.currentHeight > 0)
-      return Promise.reject({code: 1}); //head has been blown off
+    if (_.get(lastBlock, 'hash')) {
+      let savedBlock = await blockModel.count({_id: lastBlock.hash});
 
-    let savedBlock = await blockModel.count({_id: lastBlock.hash});
+      if (!savedBlock)
+        return Promise.reject({code: 1});
+    }
 
-    if (!savedBlock)
-      return Promise.reject({code: 1}); //head has been blown off
+    if (!lastBlock && this.lastBlockHash)
+      return Promise.reject({code: 1});
 
     /**
      * Get raw block
