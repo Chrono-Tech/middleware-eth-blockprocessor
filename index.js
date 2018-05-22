@@ -133,7 +133,6 @@ const init = async () => {
     });
   });
 
-  return;
   let blockWatchingService = new BlockWatchingService(endBlock);
 
   blockWatchingService.events.on('block', blockEventCallback);

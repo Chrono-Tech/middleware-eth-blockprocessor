@@ -11,7 +11,7 @@ const bunyan = require('bunyan'),
   allocateBlockBuckets = require('../utils/allocateBlockBuckets'),
   blockModel = require('../models/blockModel'),
   txModel = require('../models/txModel'),
-  txLogsModel = require('../models/txLogsModel'),
+  txLogModel = require('../models/txLogModel'),
   getBlock = require('../utils/getBlock'),
   web3ProvidersService = require('../services/web3ProvidersService'),
   addBlock = require('../utils/addBlock'),
@@ -42,7 +42,7 @@ class SyncCacheService {
     log.info('indexing...');
     await blockModel.init();
     await txModel.init();
-    await txLogsModel.init();
+    await txLogModel.init();
     log.info('indexation completed!');
   }
 
@@ -95,15 +95,13 @@ class SyncCacheService {
       blocksToProcess.push(blockNumber);
 
     await Promise.map(blocksToProcess, async (blockNumber) => {
-      const data = await Promise.any(web3s.map(async (web3) => {
-        const block = await getBlock(web3, blockNumber);
-        const unconfirmedBlock = await Promise.promisify(web3.eth.getBlock)('pending', false);
-        return {block: block, unconfirmedBlock: unconfirmedBlock};
-      }));
+      const block = await Promise.any(web3s.map(async (web3) =>
+        await getBlock(web3, blockNumber)
+      ));
 
-      await addBlock(data.block, data.unconfirmedBlock, 0);
+      await addBlock(block);
       _.pull(bucket, blockNumber);
-      this.events.emit('block', data.block);
+      this.events.emit('block', block);
     }, {concurrency: web3s.length});
 
   }

@@ -1,4 +1,5 @@
 const config = require('../config'),
+  _ = require('lodash'),
   net = require('net'),
   Web3 = require('web3');
 

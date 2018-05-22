@@ -6,8 +6,10 @@
 
 const bunyan = require('bunyan'),
   _ = require('lodash'),
+  web3ProvidersService = require('../services/web3ProvidersService'),
   crypto = require('crypto'),
   sem = require('semaphore')(3),
+  Promise = require('bluebird'),
   blockModel = require('../models/blockModel'),
   txModel = require('../models/txModel'),
   txLogModel = require('../models/txLogModel'),
@@ -47,7 +49,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
       index: tx.transactionIndex,
       blockNumber: block.number,
       timestamp: tx.timestamp,
-      value: tx.value,
+      value: tx.value.toString(),
       to: tx.to,
       nonce: tx.nonce,
       gasPrice: tx.gasPrice,
@@ -57,7 +59,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
   );
 
   const logs = _.chain(block.transactions)
-    .map(tx => tx.logs(log => ({
+    .map(tx => tx.logs.map(log => ({
         _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
         blockNumber: block.number,
         txIndex: log.transactionIndex,
@@ -68,7 +70,9 @@ const updateDbStateWithBlock = async (block, removePending) => {
         address: log.address,
       })
       )
-    );
+    )
+    .flattenDeep()
+    .value();
 
   log.info(`inserting ${txs.length} txs`);
   if (txs.length) {
@@ -101,14 +105,6 @@ const updateDbStateWithBlock = async (block, removePending) => {
     await removeOutDated();
   }
 
-  /*  const txHashes = block.transactions.map(tx => tx.hash);
-   await txModel.remove({
-   $or: [
-   {hash: {$in: txHashes}},
-   {blockNumber: -1, hash: {$nin: _.get(pendingBlock, 'transactions', [])}}
-   ]
-   });*/
-
   let blockToSave = {
     _id: block.hash,
     number: block.number,
@@ -133,36 +129,22 @@ const rollbackStateFromBlock = async (block) => {
 
 const removeOutDated = async () => {
 
+  let web3s = await web3ProvidersService();
 
-  const pendingBlock = await Promise.any(this.web3s.map(async (web3) => {
+  const pendingBlock = await Promise.any(web3s.map(async (web3) => {
     return await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
   }));
 
-  const mempool = await exec('getrawmempool', []);
-
-  log.info('removing confirmed / rejected txs');
-  if (!mempool.length)
+  if (!_.get(pendingBlock, 'transactions', []).length)
     return;
 
-  let outdatedTxs = await txModel.find({_id: {$nin: mempool}, blockNumber: -1});
-
-  if (outdatedTxs.length) {
-
-    await coinModel.remove({
-      $or: _.chain(outdatedTxs).map(tx => {
-        return [
-          {outputBlock: -1, outputTxIndex: tx.index},
-          {inputBlock: -1, inputTxIndex: tx.index}
-        ];
-      }).flattenDeep().value()
+  if (pendingBlock.transactions.length)
+    await txModel.remove({
+      _id: {
+        $in: pendingBlock.transactions
+      }
     });
 
-    await txAddressRelationsModel.remove({
-      $or: outdatedTxs.map(tx => ({blockNumber: -1, txIndex: tx.index}))
-    });
-
-    await txModel.remove({_id: {$nin: mempool}, blockNumber: -1});
-  }
 };
 
 module.exports = addBlock;

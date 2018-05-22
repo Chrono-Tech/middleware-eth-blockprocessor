@@ -17,7 +17,7 @@ const TX = new mongoose.Schema({
   _id: {type: String},
   blockNumber: {type: Number, required: true, default: -1},
   index: {type: Number},
-  value: {type: Number},
+  value: {type: String},
   to: {type: String, index: true},
   nonce: {type: Number},
   input: {type: String},
