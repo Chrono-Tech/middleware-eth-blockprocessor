@@ -5,8 +5,8 @@
  */
 
 const _ = require('lodash'),
-  config = require('../config'),
   bunyan = require('bunyan'),
+  web3ProvidersService = require('../services/web3ProvidersService'),
   Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app.utils.allocateBlockBuckets'}),
   blockModel = require('../models/blockModel');
@@ -47,25 +47,26 @@ const blockValidator = async (minBlock, maxBlock, chunkSize) => {
   return data;
 };
 
-module.exports = async function (web3s) {
+module.exports = async function () {
+
+  let web3s = await web3ProvidersService();
 
   let currentNodesHeight = await Promise.mapSeries(web3s, async web3 => await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => -1));
   const currentNodeHeight = _.chain(currentNodesHeight).reject(height => height === -1)
     .max()
     .defaults(-1)
+    .sum(0)
     .value();
 
   if (currentNodeHeight === -1)
     return Promise.reject({code: 0});
 
-  const currentValidatedHeight = currentNodeHeight - config.consensus.lastBlocksValidateAmount < 0 ? 0 : currentNodeHeight - config.consensus.lastBlocksValidateAmount;
-
-  let missedBuckets = await blockValidator(0, currentValidatedHeight, 10000);
+  let missedBuckets = await blockValidator(0, currentNodeHeight - 2, 10000);
   missedBuckets = _.reverse(missedBuckets);
 
   return {
     missedBuckets: missedBuckets,
-    height: currentValidatedHeight
+    height: currentNodeHeight === 0 ? currentNodeHeight : currentNodeHeight - 1
   };
 
 };

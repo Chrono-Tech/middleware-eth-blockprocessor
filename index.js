@@ -21,8 +21,7 @@ const _ = require('lodash'),
   BlockWatchingService = require('./services/blockWatchingService'),
   SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
-  Web3 = require('web3'),
-  net = require('net'),
+  web3ProvidersService = require('./services/web3ProvidersService'),
   amqp = require('amqplib'),
   log = bunyan.createLogger({name: 'app'}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
@@ -36,6 +35,7 @@ const _ = require('lodash'),
 
 const init = async () => {
 
+/*
   const web3s = config.web3.providers.map((providerURI) => {
     const provider = /^http/.test(providerURI) ?
       new Web3.providers.HttpProvider(providerURI) :
@@ -58,6 +58,7 @@ const init = async () => {
 
     return web3;
   });
+*/
 
   let amqpInstance = await amqp.connect(config.rabbit.url)
     .catch(() => {
@@ -78,7 +79,9 @@ const init = async () => {
   const masterNodeService = new MasterNodeService(channel, (msg) => log.info(msg));
   await masterNodeService.start();
 
-  const syncCacheService = new SyncCacheService(web3s);
+  await web3ProvidersService();
+
+  const syncCacheService = new SyncCacheService();
 
   let blockEventCallback = async block => {
     log.info(`${block.hash} (${block.number}) added to cache.`);
@@ -130,7 +133,7 @@ const init = async () => {
     });
   });
 
-  let blockWatchingService = new BlockWatchingService(web3s, endBlock);
+  let blockWatchingService = new BlockWatchingService(endBlock);
 
   blockWatchingService.events.on('block', blockEventCallback);
   blockWatchingService.events.on('tx', txEventCallback);
