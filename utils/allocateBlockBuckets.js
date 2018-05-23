@@ -55,7 +55,7 @@ module.exports = async function () {
   const currentNodeHeight = _.chain(currentNodesHeight).reject(height => height === -1)
     .max()
     .defaults(-1)
-    .sum(0)
+    .thru(number=>parseInt(number))
     .value();
 
   if (currentNodeHeight === -1)
