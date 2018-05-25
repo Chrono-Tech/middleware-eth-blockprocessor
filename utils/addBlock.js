@@ -45,31 +45,31 @@ const addBlock = async (block, removePending = false) => {
 const updateDbStateWithBlock = async (block, removePending) => {
 
   let txs = block.transactions.map(tx => ({
-    _id: tx.hash,
-    index: tx.transactionIndex,
-    blockNumber: block.number,
-    timestamp: tx.timestamp,
-    value: tx.value.toString(),
-    to: tx.to,
-    nonce: tx.nonce,
-    gasPrice: tx.gasPrice,
-    gas: tx.gas,
-    from: tx.from
-  })
+      _id: tx.hash,
+      index: tx.transactionIndex,
+      blockNumber: block.number,
+      timestamp: tx.timestamp,
+      value: tx.value.toString(),
+      to: tx.to,
+      nonce: tx.nonce,
+      gasPrice: tx.gasPrice.toString(),
+      gas: tx.gas,
+      from: tx.from
+    })
   );
 
   const logs = _.chain(block.transactions)
     .map(tx => tx.logs.map(log => ({
-      _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
-      blockNumber: block.number,
-      txIndex: log.transactionIndex,
-      index: log.logIndex,
-      removed: log.removed,
-      signature: _.get(log, 'topics.0'), //0 topic
-      topics: log.topics,
-      address: log.address,
-    })
-    )
+        _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
+        blockNumber: block.number,
+        txIndex: log.transactionIndex,
+        index: log.logIndex,
+        removed: log.removed,
+        signature: _.get(log, 'topics.0'), //0 topic
+        topics: log.topics,
+        address: log.address,
+      })
+      )
     )
     .flattenDeep()
     .value();
@@ -141,8 +141,9 @@ const removeOutDated = async () => {
   if (pendingBlock.transactions.length)
     await txModel.remove({
       _id: {
-        $in: pendingBlock.transactions
-      }
+        $nin: pendingBlock.transactions
+      },
+      blockNumber: -1
     });
 
 };
