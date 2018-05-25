@@ -25,7 +25,7 @@ module.exports = async (tx) => {
     to: tx.to,
     nonce: tx.nonce,
     input: tx.input,
-    gasPrice: tx.gasPrice,
+    gasPrice: tx.gasPrice.toString(),
     gas: tx.gas,
     from: tx.from
   };
