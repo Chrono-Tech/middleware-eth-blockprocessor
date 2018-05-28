@@ -6,7 +6,7 @@
 
 const _ = require('lodash'),
   bunyan = require('bunyan'),
-  web3ProvidersService = require('../services/web3ProvidersService'),
+  providerService = require('../services/providerService'),
   Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app.utils.allocateBlockBuckets'}),
   blockModel = require('../models/blockModel');
@@ -49,14 +49,10 @@ const blockValidator = async (minBlock, maxBlock, chunkSize) => {
 
 module.exports = async function () {
 
-  let web3s = await web3ProvidersService();
+  let web3 = await providerService.get();
 
-  let currentNodesHeight = await Promise.mapSeries(web3s, async web3 => await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => -1));
-  const currentNodeHeight = _.chain(currentNodesHeight).reject(height => height === -1)
-    .max()
-    .defaults(-1)
-    .thru(number=>parseInt(number))
-    .value();
+  let currentNodeHeight = await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => -1);
+  currentNodeHeight = parseInt(currentNodeHeight);
 
   if (currentNodeHeight === -1)
     return Promise.reject({code: 0});

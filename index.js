@@ -21,7 +21,7 @@ const _ = require('lodash'),
   BlockWatchingService = require('./services/blockWatchingService'),
   SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
-  web3ProvidersService = require('./services/web3ProvidersService'),
+  //web3ProvidersService = require('./services/web3ProvidersService'),
   amqp = require('amqplib'),
   log = bunyan.createLogger({name: 'app'}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
@@ -55,7 +55,7 @@ const init = async () => {
   const masterNodeService = new MasterNodeService(channel, (msg) => log.info(msg));
   await masterNodeService.start();
 
-  await web3ProvidersService();
+  //await web3ProvidersService();
 
   const syncCacheService = new SyncCacheService();
 
@@ -109,7 +109,7 @@ const init = async () => {
     });
   });
 
-  let blockWatchingService = new BlockWatchingService(endBlock);
+/*  let blockWatchingService = new BlockWatchingService(endBlock);
 
   blockWatchingService.events.on('block', blockEventCallback);
   blockWatchingService.events.on('tx', txEventCallback);
@@ -119,7 +119,7 @@ const init = async () => {
       log.error('no connections available or blockchain is not synced!');
       process.exit(0);
     }
-  });
+  });*/
 
 };
 
