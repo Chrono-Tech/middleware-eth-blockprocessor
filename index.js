@@ -21,7 +21,6 @@ const _ = require('lodash'),
   BlockWatchingService = require('./services/blockWatchingService'),
   SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
-  //web3ProvidersService = require('./services/web3ProvidersService'),
   amqp = require('amqplib'),
   log = bunyan.createLogger({name: 'app'}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
@@ -34,7 +33,6 @@ const _ = require('lodash'),
 );
 
 const init = async () => {
-
 
   let amqpInstance = await amqp.connect(config.rabbit.url)
     .catch(() => {
@@ -51,11 +49,8 @@ const init = async () => {
 
   await channel.assertExchange('events', 'topic', {durable: false});
 
-
   const masterNodeService = new MasterNodeService(channel, (msg) => log.info(msg));
   await masterNodeService.start();
-
-  //await web3ProvidersService();
 
   const syncCacheService = new SyncCacheService();
 
@@ -90,14 +85,7 @@ const init = async () => {
 
   syncCacheService.events.on('block', blockEventCallback);
 
-  let endBlock = await syncCacheService.start()
-    .catch((err) => {
-      if (_.get(err, 'code') === 0) {
-        log.info('nodes are down or not synced!');
-        process.exit(0);
-      }
-      log.error(err);
-    });
+  let endBlock = await syncCacheService.start();
 
   await new Promise((res) => {
     if (config.sync.shadow)
@@ -109,18 +97,12 @@ const init = async () => {
     });
   });
 
-/*  let blockWatchingService = new BlockWatchingService(endBlock);
+  let blockWatchingService = new BlockWatchingService(endBlock);
 
   blockWatchingService.events.on('block', blockEventCallback);
   blockWatchingService.events.on('tx', txEventCallback);
 
-  await blockWatchingService.startSync().catch(err => {
-    if (_.get(err, 'code') === 0) {
-      log.error('no connections available or blockchain is not synced!');
-      process.exit(0);
-    }
-  });*/
-
+  await blockWatchingService.startSync();
 };
 
 module.exports = init();

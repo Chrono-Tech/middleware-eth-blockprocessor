@@ -80,11 +80,11 @@ class SyncCacheService {
     log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
 
     let blocksToProcess = [];
-    for(let blockNumber = bucket[0]; blockNumber <= _.last(bucket); blockNumber++)
+    for(let blockNumber = _.last(bucket); blockNumber >= bucket[0]; blockNumber--)
       blocksToProcess.push(blockNumber);
 
     await Promise.mapSeries(blocksToProcess, async (blockNumber) => {
-      const block = await getBlock(web3, blockNumber);
+      const block = await getBlock(blockNumber);
 
       await addBlock(block);
       _.pull(bucket, blockNumber);

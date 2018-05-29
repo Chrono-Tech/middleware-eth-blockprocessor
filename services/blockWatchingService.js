@@ -12,9 +12,9 @@ const config = require('../config'),
   addBlock = require('../utils/addBlock'),
   blockModel = require('../models/blockModel'),
   txModel = require('../models/txModel'),
+  providerService = require('../services/providerService'),
   addUnconfirmedTx = require('../utils/addUnconfirmedTx'),
   getBlock = require('../utils/getBlock'),
-  web3ProvidersService = require('./web3ProvidersService'),
   log = bunyan.createLogger({name: 'app.services.blockCacheService'});
 
 /**
@@ -38,11 +38,9 @@ class BlockWatchingService {
       return;
 
     this.isSyncing = true;
-    this.web3s = await web3ProvidersService();
+    let web3 = await providerService.get();
 
-    const pendingBlock = await Promise.any(this.web3s.map(async (web3) => {
-      return await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
-    }));
+    const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
 
     if (!pendingBlock)
       await txModel.remove({blockNumber: -1});
@@ -50,13 +48,9 @@ class BlockWatchingService {
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.lastBlockHash = null;
     this.doJob();
-    this.pendingFilters = this.web3s.map(web3 =>
-      web3.eth.filter('pending')
-    );
 
-    this.pendingFilters.map((filter, index) =>
-      filter.watch((err, result) => this.UnconfirmedTxEvent(err, result, this.web3s[index]))
-    );
+    this.unconfirmedTxEventCallback = result=> this.unconfirmedTxEvent(result);
+    providerService.events.on('unconfirmedTx', this.unconfirmedTxEventCallback);
 
   }
 
@@ -72,11 +66,6 @@ class BlockWatchingService {
 
         if (err instanceof Promise.TimeoutError)
           continue;
-
-        if (err instanceof Promise.AggregateError) {
-          log.error('all nodes are down or not synced!');
-          process.exit(0);
-        }
 
         if (_.get(err, 'code') === 0) {
           log.info(`await for next block ${this.currentHeight}`);
@@ -106,11 +95,9 @@ class BlockWatchingService {
 
   }
 
-  async UnconfirmedTxEvent (err, result, web3) {
+  async unconfirmedTxEvent (result) {
 
-    if (err)
-      return;
-
+    let web3 = await providerService.get();
     let tx = await Promise.promisify(web3.eth.getTransaction)(result);
 
     if (!_.has(tx, 'hash'))
@@ -125,25 +112,21 @@ class BlockWatchingService {
 
   async stopSync () {
     this.isSyncing = false;
-    await new Promise((res) =>
-      this.pendingFilter.stopWatching(res)
-    );
+    providerService.events.removeListener('unconfirmedTx', this.unconfirmedTxEventCallback);
+
   }
 
   async processBlock () {
 
-    const blocks = await Promise.map(this.web3s, async (web3) => {
-      return await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => 0);
-    });
-
-    const block = _.max(blocks);
+    let web3 = await providerService.get();
+    const block = await Promise.promisify(web3.eth.getBlockNumber)().timeout(2000).catch(() => 0);
 
     if (block === this.currentHeight - 1)
       return Promise.reject({code: 0});
 
-    const lastBlock = this.currentHeight === 0 ? null : await Promise.any(this.web3s.map(async (web3) =>
-      await Promise.promisify(web3.eth.getBlock)(this.currentHeight - 1, false).timeout(60000).catch(() => null)
-    ));
+    const lastBlock = this.currentHeight === 0 ? null :
+      await Promise.promisify(web3.eth.getBlock)(this.currentHeight - 1, false).timeout(60000).catch(() => null);
+
 
     if (_.get(lastBlock, 'hash')) {
       let savedBlock = await blockModel.count({_id: lastBlock.hash});
@@ -160,9 +143,8 @@ class BlockWatchingService {
      * @type {Object}
      */
 
-    return await Promise.any(this.web3s.map(async (web3) =>
-      await getBlock(web3, this.currentHeight)
-    ));
+    return await getBlock(this.currentHeight);
+
   }
 
 }

@@ -30,7 +30,7 @@ module.exports = async (tx) => {
     from: tx.from
   };
 
-  log.info('inserting unconfirmed tx');
-  await txModel.insertMany([tx]);
+  log.info(`inserting unconfirmed tx ${tx._id}`);
+  await txModel.create(tx);
 
 };

@@ -5,20 +5,24 @@
  */
 
 const Promise = require('bluebird'),
+  providerService = require('../services/providerService'),
   _ = require('lodash');
 
-module.exports = async (web3, blockNumber) => {
+module.exports = async (blockNumber) => {
 
   /**
    * Get raw block
    * @type {Object}
    */
-  let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(60000);
+
+  let web3 = await providerService.get();
+
+  let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(10000);
 
   let logs = await new Promise((res, rej) =>
     web3.eth.filter({fromBlock: blockNumber, toBlock: blockNumber})
       .get((err, result) => err ? rej(err) : res(result))
-  ).timeout(60000);
+  ).timeout(30000);
 
   rawBlock.transactions = rawBlock.transactions.map(tx => {
     tx.timestamp = rawBlock.timestamp;
