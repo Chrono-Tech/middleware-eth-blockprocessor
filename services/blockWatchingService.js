@@ -49,7 +49,7 @@ class BlockWatchingService {
     this.lastBlockHash = null;
     this.doJob();
 
-    this.unconfirmedTxEventCallback = result=> this.unconfirmedTxEvent(result);
+    this.unconfirmedTxEventCallback = result=> this.unconfirmedTxEvent(result).catch();
     providerService.events.on('unconfirmedTx', this.unconfirmedTxEventCallback);
 
   }
@@ -128,7 +128,7 @@ class BlockWatchingService {
       await Promise.promisify(web3.eth.getBlock)(this.currentHeight - 1, false).timeout(60000).catch(() => null);
 
 
-    if (_.get(lastBlock, 'hash')) {
+    if (_.get(lastBlock, 'hash') && this.lastBlockHash) {
       let savedBlock = await blockModel.count({_id: lastBlock.hash});
 
       if (!savedBlock)

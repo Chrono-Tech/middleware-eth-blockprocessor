@@ -6,7 +6,7 @@
 
 const bunyan = require('bunyan'),
   _ = require('lodash'),
-  web3ProvidersService = require('../services/web3ProvidersService'),
+  providerService = require('../services/providerService'),
   crypto = require('crypto'),
   sem = require('semaphore')(3),
   Promise = require('bluebird'),
@@ -48,11 +48,10 @@ const updateDbStateWithBlock = async (block, removePending) => {
       _id: tx.hash,
       index: tx.transactionIndex,
       blockNumber: block.number,
-      timestamp: tx.timestamp,
-      value: tx.value.toString(),
+      value: tx.value,
       to: tx.to,
       nonce: tx.nonce,
-      gasPrice: tx.gasPrice.toString(),
+      gasPrice: tx.gasPrice,
       gas: tx.gas,
       from: tx.from
     })
@@ -108,6 +107,8 @@ const updateDbStateWithBlock = async (block, removePending) => {
   let blockToSave = {
     _id: block.hash,
     number: block.number,
+    uncleAmount: block.uncles.length,
+    totalTxFee: _.chain(block.transactions).map(tx=>tx.gasPrice * tx.gas).sum().value(),
     timestamp: block.timestamp
   };
 
@@ -129,11 +130,9 @@ const rollbackStateFromBlock = async (block) => {
 
 const removeOutDated = async () => {
 
-  let web3s = await web3ProvidersService();
+  let web3 = await providerService.get();
 
-  const pendingBlock = await Promise.any(web3s.map(async (web3) => {
-    return await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
-  }));
+  const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
 
   if (!_.get(pendingBlock, 'transactions', []).length)
     return;
