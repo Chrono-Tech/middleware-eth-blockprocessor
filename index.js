@@ -21,8 +21,6 @@ const _ = require('lodash'),
   BlockWatchingService = require('./services/blockWatchingService'),
   SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
-  Web3 = require('web3'),
-  net = require('net'),
   amqp = require('amqplib'),
   log = bunyan.createLogger({name: 'app'}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
@@ -35,29 +33,6 @@ const _ = require('lodash'),
 );
 
 const init = async () => {
-
-  const web3s = config.web3.providers.map((providerURI) => {
-    const provider = /^http/.test(providerURI) ?
-      new Web3.providers.HttpProvider(providerURI) :
-      new Web3.providers.IpcProvider(`${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${providerURI}`, net);
-
-    const web3 = new Web3();
-    web3.setProvider(provider);
-
-    if (_.has(web3, 'currentProvider.connection.on')) {
-      web3.currentProvider.connection.on('end', async () => {
-        await Promise.delay(5000);
-        web3.reset();
-      });
-
-      web3.currentProvider.connection.on('error', async () => {
-        await Promise.delay(5000);
-        web3.reset();
-      });
-    }
-
-    return web3;
-  });
 
   let amqpInstance = await amqp.connect(config.rabbit.url)
     .catch(() => {
@@ -74,11 +49,10 @@ const init = async () => {
 
   await channel.assertExchange('events', 'topic', {durable: false});
 
-
   const masterNodeService = new MasterNodeService(channel, (msg) => log.info(msg));
   await masterNodeService.start();
 
-  const syncCacheService = new SyncCacheService(web3s);
+  const syncCacheService = new SyncCacheService();
 
   let blockEventCallback = async block => {
     log.info(`${block.hash} (${block.number}) added to cache.`);
@@ -111,14 +85,7 @@ const init = async () => {
 
   syncCacheService.events.on('block', blockEventCallback);
 
-  let endBlock = await syncCacheService.start()
-    .catch((err) => {
-      if (_.get(err, 'code') === 0) {
-        log.info('nodes are down or not synced!');
-        process.exit(0);
-      }
-      log.error(err);
-    });
+  let endBlock = await syncCacheService.start();
 
   await new Promise((res) => {
     if (config.sync.shadow)
@@ -130,18 +97,12 @@ const init = async () => {
     });
   });
 
-  let blockWatchingService = new BlockWatchingService(web3s, endBlock);
+  let blockWatchingService = new BlockWatchingService(endBlock);
 
   blockWatchingService.events.on('block', blockEventCallback);
   blockWatchingService.events.on('tx', txEventCallback);
 
-  await blockWatchingService.startSync().catch(err => {
-    if (_.get(err, 'code') === 0) {
-      log.error('no connections available or blockchain is not synced!');
-      process.exit(0);
-    }
-  });
-
+  await blockWatchingService.startSync();
 };
 
 module.exports = init();

@@ -11,7 +11,10 @@ const bunyan = require('bunyan'),
   allocateBlockBuckets = require('../utils/allocateBlockBuckets'),
   blockModel = require('../models/blockModel'),
   txModel = require('../models/txModel'),
+  txLogModel = require('../models/txLogModel'),
   getBlock = require('../utils/getBlock'),
+  providerService = require('../services/providerService'),
+  //web3ProvidersService = require('../services/web3ProvidersService'),
   addBlock = require('../utils/addBlock'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
 
@@ -24,15 +27,14 @@ const bunyan = require('bunyan'),
 
 class SyncCacheService {
 
-  constructor (web3s) {
-    this.web3s = web3s;
+  constructor () {
     this.events = new EventEmitter();
     this.isSyncing = true;
   }
 
   async start () {
     await this.indexCollection();
-    let data = await allocateBlockBuckets(this.web3s);
+    let data = await allocateBlockBuckets();
     this.doJob(data.missedBuckets);
     return data.height;
   }
@@ -41,6 +43,7 @@ class SyncCacheService {
     log.info('indexing...');
     await blockModel.init();
     await txModel.init();
+    await txLogModel.init();
     log.info('indexation completed!');
   }
 
@@ -57,53 +60,35 @@ class SyncCacheService {
         this.events.emit('end');
 
       } catch (err) {
-
-        if (err instanceof Promise.AggregateError) {
-          console.log(err);
-          log.error('all nodes are down or not synced!');
-          process.exit(0);
-        }
-
         log.error(err);
-
       }
+
     this.events.emit('end');
 
   }
 
   async runPeer (bucket) {
 
-    let lastBlock = await Promise.any(this.web3s.map(async (web3) => {
-      const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(bucket), false).timeout(60000);
+    let web3 = await providerService.get();
 
-      if (!_.has(lastBlock, 'number'))
-        return Promise.reject();
+    const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(bucket), false).timeout(60000);
 
-      return lastBlock.number;
-    }));
 
-    if (!lastBlock)
+    if (!lastBlock || (_.last(bucket) !== 0 && !lastBlock.number))
       return await Promise.delay(10000);
 
     log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
 
     let blocksToProcess = [];
-    for(let blockNumber = bucket[0]; blockNumber <= _.last(bucket); blockNumber++)
+    for(let blockNumber = _.last(bucket); blockNumber >= bucket[0]; blockNumber--)
       blocksToProcess.push(blockNumber);
 
-    await Promise.map(blocksToProcess, async (blockNumber) => {
-      const data = await Promise.any(this.web3s.map(async (web3) => {
-        const block = await getBlock(web3, blockNumber);
-        const unconfirmedBlock = await Promise.promisify(web3.eth.getBlock)('pending', false);
-        return {block: block, unconfirmedBlock: unconfirmedBlock};
-      }));
+    await Promise.mapSeries(blocksToProcess, async (blockNumber) => {
+      const block = await getBlock(blockNumber);
 
-      await addBlock(data.block, data.unconfirmedBlock, 0);
+      await addBlock(block);
       _.pull(bucket, blockNumber);
-      this.events.emit('block', data.block);
-    }, {concurrency: this.web3s.length}).catch((e) => {
-      if (e && e.code === 11000)
-        _.pull(bucket, bucket[0]);
+      this.events.emit('block', block);
     });
 
   }
