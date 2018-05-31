@@ -19,6 +19,9 @@ module.exports = async (blockNumber) => {
 
   let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(10000);
 
+  if(!rawBlock)
+    return Promise.reject({code: 2});
+
   rawBlock.uncleAmount = rawBlock.uncles.length;
 
   if (!rawBlock.transactions.length) {

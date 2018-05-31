@@ -8,6 +8,7 @@ const bunyan = require('bunyan'),
   _ = require('lodash'),
   config = require('../config'),
   Web3 = require('web3'),
+  sem = require('semaphore')(1),
   net = require('net'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
@@ -26,6 +27,11 @@ class providerService {
     this.events = new EventEmitter();
     this.connector = null;
     this.filter = null;
+
+    if (config.web3.providers.length > 1)
+      this.findBestNodeInterval = setInterval(() => {
+        this.switchConnectorSafe();
+      }, 60000 * 5);
   }
 
   makeWeb3FromProviderURI (providerURI) {
@@ -56,6 +62,12 @@ class providerService {
       log.error('no available connection!');
       process.exit(0);
     });
+
+    const fullProviderURI = !/^http/.test(providerURI) ? `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${providerURI}` : providerURI;
+    const currentProviderURI = this.connector ? this.connector.currentProvider.path || this.connector.currentProvider.host : '';
+
+    if (currentProviderURI === fullProviderURI)
+      return;
 
     this.connector = this.makeWeb3FromProviderURI(providerURI);
 
@@ -91,8 +103,19 @@ class providerService {
 
   }
 
+  async switchConnectorSafe () {
+
+    return new Promise(res => {
+      sem.take(async () => {
+        await this.switchConnector();
+        res(this.connector);
+        sem.leave();
+      });
+    });
+  }
+
   async get () {
-    return this.connector && this.connector.isConnected() ? this.connector : await this.switchConnector();
+    return this.connector && this.connector.isConnected() ? this.connector : await this.switchConnectorSafe();
   }
 
 }
