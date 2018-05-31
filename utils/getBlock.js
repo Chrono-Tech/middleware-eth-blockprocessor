@@ -5,27 +5,39 @@
  */
 
 const Promise = require('bluebird'),
+  providerService = require('../services/providerService'),
   _ = require('lodash');
 
-module.exports = async (web3, blockNumber) => {
+module.exports = async (blockNumber) => {
 
   /**
    * Get raw block
    * @type {Object}
    */
-  let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(60000);
+
+  let web3 = await providerService.get();
+
+  let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(10000);
+
+  if(!rawBlock)
+    return Promise.reject({code: 2});
+
+  rawBlock.uncleAmount = rawBlock.uncles.length;
+
+  if (!rawBlock.transactions.length) {
+    rawBlock.totalTxFee = 0;
+    return rawBlock;
+  }
 
   let logs = await new Promise((res, rej) =>
     web3.eth.filter({fromBlock: blockNumber, toBlock: blockNumber})
       .get((err, result) => err ? rej(err) : res(result))
-  ).timeout(60000);
+  ).timeout(30000);
 
   rawBlock.transactions = rawBlock.transactions.map(tx => {
-    tx.timestamp = rawBlock.timestamp;
     tx.logs = _.chain(logs)
       .filter({transactionHash: tx.hash})
       .map(item => {
-        item = _.omit(item, ['transactionHash', 'transactionIndex', 'blockHash', 'blockNumber']);
         if (item.topics.length)
           item.signature = item.topics[0];
         return item;

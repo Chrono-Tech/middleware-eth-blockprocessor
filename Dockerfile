@@ -19,6 +19,8 @@ RUN mkdir src && cd src && \
     middleware-eth-ipfs"#$RELEASE" \
     middleware-eth-erc20"#$RELEASE" \
     middleware-eth-rest"#$RELEASE" \
-    middleware-eth-nem-action-processor"#$RELEASE"
-EXPOSE 8080
+    middleware-eth-nem-action-processor"#$RELEASE" \
+    middleware-eth-2fa"#$RELEASE" \
+    middleware-eth-sidechain"#$RELEASE"
+EXPOSE 8080 8081 8082
 CMD pm2-docker start /mnt/config/${NETWORK_TYPE}/ecosystem.config.js

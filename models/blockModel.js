@@ -13,12 +13,15 @@
 const mongoose = require('mongoose'),
   config = require('../config');
 
+require('mongoose-long')(mongoose);
+
 const Block = new mongoose.Schema({
+  _id: {type: String},
   number: {type: Number, unique: true, index: true},
-  hash: {type: String, unique: true, index: true},
-  timestamp: {type: Number, required: true, index: true},
-  txs: [{type: String}],
+  timestamp: {type: Number, required: true},
+  uncleAmount: {type: Number, required: true},
+  totalTxFee: {type: mongoose.Schema.Types.Long, required: true},
   created: {type: Date, required: true, default: Date.now}
-});
+}, {_id: false});
 
 module.exports = mongoose.model(`${config.mongo.data.collectionPrefix}Block`, Block);
