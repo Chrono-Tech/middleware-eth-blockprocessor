@@ -105,7 +105,7 @@ class BlockWatchingService {
 
     tx.logs = [];
 
-    await addUnconfirmedTx(tx).catch((e) => log.error(e));
+    await addUnconfirmedTx(tx);
     this.events.emit('tx', tx);
 
   }
