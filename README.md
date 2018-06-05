@@ -15,7 +15,7 @@ This module is used for updating balances for registered accounts (see a descrip
 
 #### How does it work?
 
-Block processor connects to ipc, fetch blocks one by one and cache them in mongodb.
+Block processor connects to ipc / http endpoint, fetch blocks one by one and cache them in mongodb.
 
 Which txs block processor filter?
 
@@ -29,7 +29,7 @@ Block processor filter txs by specified user accounts (addresses). The addresses
 }
 ```
 
-So, when someone, for instance do a transaction (sample from web3 console):
+So, when someone, for instance send a transaction (sample from web3 console):
 ```
 /* eth.accounts[0] - "0x1cc5ceebda535987a4800062f67b9b78be0ef419" */
 eth.sendTransaction({from: eth.accounts[0], to: eth.accounts[1], value: 200})
@@ -89,10 +89,94 @@ All in all, in order to be subscribed, you need to do the following:
 But be aware of it - when a new tx arrives, the block processor sends 2 messages for the same one transaction - for both addresses, who participated in transaction (from and to recepients). The sent message represent the payload field from transaction object (by this unique field you can easely fetch the raw transaction from mongodb for your own purpose).
 
 
-### multiple ipc providers
-In order to increase stability and speed up the syncing process itself, we have introduced an ability to specify several connections to nodes via ipc. The worflow is simple:
-1) during caching, the necessary blocks, which should be processed, are divided into chunks, each connection should get its chunk and place to mongodb cache. In case, the connection has been dropped, these chunks are going to be processed by next connection
-2) During scanning for the latest blocks, we pick up only single connection (through the race condition). In case, the connection got down - we pick up another one.
+### multiple providers
+In order to increase stability and speed up the syncing process itself, we have introduced an ability to specify several connections to nodes via ipc / http. The worflow is simple:
+1) during caching, the necessary blocks, which should be processed, are processed serially (from last known height down to 0 height) through one chosen provider
+2) the povider is going to be choosed by the round-robbin strategy. This strategy happens every 5 minutes, in order to check that speed of current provider hasn't degradated.
+3) During scanning for the latest blocks, we pick up only single connection (through the race condition). In case, the connection got down - we pick up another one.
+
+
+#### cache system
+In order to make it possible to work with custom queries (in [rest](https://github.com/ChronoBank/middleware-eth-rest)), or perform any kind of analytic tasks, we have introduced the caching system. This system stores all blocks and txs in mongodb under the specific collections: blocks, txes, txlogs.
+
+
+##### blocks
+The blocks collection stores only the most valuable information about the block. Here is the example of block:
+```
+    "_id" : "0x85e0b80172426e9be5202a8a7a7d8d035340072bbed2e357ee80029a26ab9244",
+    "__v" : 0,
+    "number" : 2379390,
+    "timestamp" : 1527760928,
+    "totalTxFee" : NumberLong(10704416000000000),
+    "uncleAmount" : 0
+```
+
+Here is the description:
+
+| field name | index | description|
+| ------ | ------ | ------ |
+| _id   | true | the hash of block
+| number   | true | the block number
+| totalTxFee   | false | total received fee from all txs, included in block (useful for calculating the block reward)
+| uncleAmount   | false | total unclue amount (useful for calculating the block reward)
+
+
+##### txs
+The txs collection stores only the most valuable information about the transaction. Here is the example of transaction:
+```
+    "_id" : "0x3a2c4269effb9ca2271d1cf0c42ddad0ed741c5961024dcc7b3dab1a5e161058",
+    "blockNumber" : 2379392,
+    "from" : "0x1fabf3c6d95dbba5b54034f62dd8bc2f71abbd9b",
+    "gas" : NumberLong(405474),
+    "gasPrice" : NumberLong(1000000000),
+    "index" : 14,
+    "nonce" : 596,
+    "to" : "0xfe2149773b3513703e79ad23d05a778a185016ee",
+    "value" : NumberLong(3000000000000000)
+```
+
+Here is the description:
+
+| field name | index | description|
+| ------ | ------ | ------ |
+| _id   | true | the hash of transaction
+| blockNumber   | false | the block number
+| from   | true | from address (who sent tx)
+| gas   | false | the gas
+| gasPrice   | false | the gas price
+| index   | true | the transaction index in block
+| nonce   | false | unique incremented field (in describe the total amount of already performed transactions count + 1 from the "from" address)
+| to   | true | to address (who received tx)
+| value   | false | the sent amount of money
+
+
+##### txlogs
+The txlogs collection stores only the most valuable information about the transaction's logs. Here is the example of the log:
+```
+    "_id" : "1120c77a38f4379eae6a077931919f38",
+    "address" : "0xfe2149773b3513703e79ad23d05a778a185016ee",
+    "blockNumber" : 2379392,
+    "index" : 2,
+    "removed" : false,
+    "signature" : "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+    "topics" : [
+        "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+    ],
+    "txIndex" : 1
+```
+
+Here is the description:
+
+| field name | index | description|
+| ------ | ------ | ------ |
+| _id   | true | mongo generated id
+| address   | true | the address, from which the log has been emitted
+| blockNumber   | true | block number
+| index   | true | log index
+| removed   | false | has log been removed
+| signature   | true | it's the topics[0]. Useful, in case you need to find event by signature
+| topics   | false | the topics array
+| txIndex   | true | the transaction index
 
 
 ##### сonfigure your .env
@@ -112,7 +196,6 @@ RABBIT_SERVICE_NAME=app_eth
 NETWORK=development
 
 SYNC_SHADOW=1
-#WEB3_URI=/tmp/development/geth.ipc
 
 PROVIDERS=tmp/development/geth.ipc,tmp/development/geth2.ipc
 ```
@@ -130,8 +213,8 @@ The options are presented below:
 | RABBIT_URI   | rabbitmq URI connection string
 | RABBIT_SERVICE_NAME   | namespace for all rabbitmq queues, like 'app_eth_transaction'
 | NETWORK   | network name (alias)- is used for connecting via ipc (see block processor section)
-| SYNC_SHADOW   | sync blocks in background
-| PROVIDERS   | the paths to ipc interface, written with comma sign
+| SYNC_SHADOW   | sync blocks in background, or await, until the whole blockchain will be cached in db
+| PROVIDERS   | the paths to ipc / http interface, written with comma sign
 | WEB3_URI (deprecated)   | the path to ipc interface
 
 License
