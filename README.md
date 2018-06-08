@@ -10,7 +10,7 @@ This module is a part of middleware services. You can install it in 2 ways:
 2) by hands: just clone the repo, do 'npm install', set your .env - and you are ready to go
 
 #### About
-This module is used for updating balances for registered accounts (see a description of accounts in [block processor](https://github.com/ChronoBank/middleware-eth-blockprocessor)).
+This module is used for watching new blocks and txs for registered on platform users (please, check out - how you can register new user via [rest api](https://github.com/ChronoBank/middleware-eth-rest)).
 
 
 #### How does it work?
@@ -97,10 +97,10 @@ In order to increase stability and speed up the syncing process itself, we have 
 
 
 #### cache system
-In order to make it possible to work with custom queries (in [rest](https://github.com/ChronoBank/middleware-eth-rest)), or perform any kind of analytic tasks, we have introduced the caching system. This system stores all blocks and txs in mongodb under the specific collections: blocks, txes, txlogs.
+In order to make it possible to work with custom queries (in [rest](https://github.com/ChronoBank/middleware-eth-rest)), or perform any kind of analytic tasks, we have introduced the caching system. This system stores all blocks and txs in mongodb under the specific collections: ethblocks, ethtxes, ethtxlogs.
 
 
-##### blocks
+##### ethblocks
 The blocks collection stores only the most valuable information about the block. Here is the example of block:
 ```
     "_id" : "0x85e0b80172426e9be5202a8a7a7d8d035340072bbed2e357ee80029a26ab9244",
@@ -121,8 +121,8 @@ Here is the description:
 | uncleAmount   | false | total unclue amount (useful for calculating the block reward)
 
 
-##### txs
-The txs collection stores only the most valuable information about the transaction. Here is the example of transaction:
+##### ethtxes
+The ethtxes collection stores only the most valuable information about the transaction. Here is the example of transaction:
 ```
     "_id" : "0x3a2c4269effb9ca2271d1cf0c42ddad0ed741c5961024dcc7b3dab1a5e161058",
     "blockNumber" : 2379392,
@@ -150,8 +150,8 @@ Here is the description:
 | value   | false | the sent amount of money
 
 
-##### txlogs
-The txlogs collection stores only the most valuable information about the transaction's logs. Here is the example of the log:
+##### ethtxlogs
+The ethtxlogs collection stores only the most valuable information about the transaction's logs. Here is the example of the log:
 ```
     "_id" : "1120c77a38f4379eae6a077931919f38",
     "address" : "0xfe2149773b3513703e79ad23d05a778a185016ee",
