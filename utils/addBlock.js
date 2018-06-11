@@ -10,15 +10,14 @@ const bunyan = require('bunyan'),
   crypto = require('crypto'),
   sem = require('semaphore')(3),
   Promise = require('bluebird'),
-  blockModel = require('../models/blockModel'),
-  txModel = require('../models/txModel'),
-  txLogModel = require('../models/txLogModel'),
+  models = require('../models'),
   log = bunyan.createLogger({name: 'app.services.addBlock'});
 
 /**
  * @service
  * @description filter txs by registered addresses
- * @param block - an array of txs
+ * @param block - the block object
+ * @param removePending - remove unconfirmed txs, which has been pulled from mempool
  * @returns {Promise.<*>}
  */
 
@@ -83,7 +82,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
       }
     }));
 
-    await txModel.bulkWrite(bulkOps);
+    await models.txModel.bulkWrite(bulkOps);
   }
 
   log.info(`inserting ${logs.length} logs`);
@@ -96,7 +95,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
       }
     }));
 
-    await txLogModel.bulkWrite(bulkOps);
+    await models.txLogModel.bulkWrite(bulkOps);
   }
 
   if (removePending) {
@@ -112,20 +111,20 @@ const updateDbStateWithBlock = async (block, removePending) => {
     timestamp: block.timestamp
   };
 
-  await blockModel.update({_id: blockToSave._id}, blockToSave, {upsert: true});
+  await models.blockModel.update({_id: blockToSave._id}, blockToSave, {upsert: true});
 
 };
 
 const rollbackStateFromBlock = async (block) => {
 
   log.info('rolling back txs state');
-  await txModel.remove({blockNumber: block.number});
+  await models.txModel.remove({blockNumber: block.number});
 
   log.info('rolling back tx logs state');
-  await txLogModel.remove({blockNumber: block.number});
+  await models.txLogModel.remove({blockNumber: block.number});
 
   log.info('rolling back blocks state');
-  await blockModel.remove({number: block.number});
+  await models.blockModel.remove({number: block.number});
 };
 
 const removeOutDated = async () => {
@@ -138,7 +137,7 @@ const removeOutDated = async () => {
     return;
 
   if (pendingBlock.transactions.length)
-    await txModel.remove({
+    await models.txModel.remove({
       _id: {
         $nin: pendingBlock.transactions
       },

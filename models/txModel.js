@@ -27,8 +27,9 @@ const TX = new mongoose.Schema({
   gasPrice: {type: mongoose.Schema.Types.Long},
   gas: {type: mongoose.Schema.Types.Long},
   from: {type: String, index: true}
-}, { _id: false });
+}, {_id: false});
 
 TX.index({blockNumber: 1, index: 1});
 
-module.exports = mongoose.model(`${config.mongo.data.collectionPrefix}TX`, TX);
+module.exports = () =>
+  mongoose.model(`${config.mongo.data.collectionPrefix}TX`, TX);

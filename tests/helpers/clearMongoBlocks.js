@@ -3,8 +3,8 @@
  * Licensed under the AGPL Version 3 license.
  */
 
-const accountModel = require('../../models/accountModel'),
-    blockModel = require('../../models/blockModel');
+const accountModel = require('../../models').accountModel,
+    blockModel = require('../../models').blockModel;
 
 
 module.exports =  async function () {

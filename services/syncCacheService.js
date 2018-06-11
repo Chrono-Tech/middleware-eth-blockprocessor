@@ -8,13 +8,11 @@ const bunyan = require('bunyan'),
   _ = require('lodash'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
+  syncCacheServiceInterface = require('middleware-common-components/interfaces/blockProcessor/syncCacheServiceInterface'),
   allocateBlockBuckets = require('../utils/allocateBlockBuckets'),
-  blockModel = require('../models/blockModel'),
-  txModel = require('../models/txModel'),
-  txLogModel = require('../models/txLogModel'),
+  models = require('../models'),
   getBlock = require('../utils/getBlock'),
   providerService = require('../services/providerService'),
-  //web3ProvidersService = require('../services/web3ProvidersService'),
   addBlock = require('../utils/addBlock'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
 
@@ -29,7 +27,6 @@ class SyncCacheService {
 
   constructor () {
     this.events = new EventEmitter();
-    this.isSyncing = true;
   }
 
   async start () {
@@ -41,9 +38,9 @@ class SyncCacheService {
 
   async indexCollection () {
     log.info('indexing...');
-    await blockModel.init();
-    await txModel.init();
-    await txLogModel.init();
+    await models.blockModel.init();
+    await models.txModel.init();
+    await models.txLogModel.init();
     log.info('indexation completed!');
   }
 
@@ -94,4 +91,6 @@ class SyncCacheService {
   }
 }
 
-module.exports = SyncCacheService;
+module.exports = function (...args) {
+  return syncCacheServiceInterface(new SyncCacheService(...args));
+};

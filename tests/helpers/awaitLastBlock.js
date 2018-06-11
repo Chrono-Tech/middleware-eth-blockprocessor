@@ -4,8 +4,7 @@
  * @author Egor Zuev <zyev.egor@gmail.com>
  */
 
-const blockModel = require('../../models/blockModel'),
-  config = require('../../config'),
+const blockModel = require('../../models').blockModel,
   _ = require('lodash'),
   Promise = require('bluebird');
 

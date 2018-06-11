@@ -10,6 +10,7 @@ const bunyan = require('bunyan'),
   Web3 = require('web3'),
   sem = require('semaphore')(1),
   net = require('net'),
+  providerServiceInterface = require('middleware-common-components/interfaces/blockProcessor/providerServiceInterface'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
@@ -120,4 +121,4 @@ class providerService {
 
 }
 
-module.exports = new providerService();
+module.exports = providerServiceInterface(new providerService());
