@@ -3,11 +3,9 @@
  * Licensed under the AGPL Version 3 license.
  */
 
-const accountModel = require('../../models').accountModel,
-    blockModel = require('../../models').blockModel;
-
+const models = require('../../models');
 
 module.exports =  async function () {
-    await accountModel.remove()
-    await blockModel.remove()
+    await models.accountModel.remove();
+    await models.blockModel.remove();
 };
