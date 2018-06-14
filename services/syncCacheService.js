@@ -9,11 +9,11 @@ const bunyan = require('bunyan'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   syncCacheServiceInterface = require('middleware-common-components/interfaces/blockProcessor/syncCacheServiceInterface'),
-  allocateBlockBuckets = require('../utils/allocateBlockBuckets'),
+  allocateBlockBuckets = require('../utils/blocks/allocateBlockBuckets'),
   models = require('../models'),
-  getBlock = require('../utils/getBlock'),
+  getBlock = require('../utils/blocks/getBlock'),
   providerService = require('../services/providerService'),
-  addBlock = require('../utils/addBlock'),
+  addBlock = require('../utils/blocks/addBlock'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
 
 /**

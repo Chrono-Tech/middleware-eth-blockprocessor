@@ -6,11 +6,11 @@
 
 const bunyan = require('bunyan'),
   _ = require('lodash'),
-  providerService = require('../services/providerService'),
+  removeUnconfirmedTxs = require('../txs/removeUnconfirmedTxs'),
   crypto = require('crypto'),
   sem = require('semaphore')(3),
   Promise = require('bluebird'),
-  models = require('../models'),
+  models = require('../../models'),
   log = bunyan.createLogger({name: 'app.services.addBlock'});
 
 /**
@@ -44,30 +44,30 @@ const addBlock = async (block, removePending = false) => {
 const updateDbStateWithBlock = async (block, removePending) => {
 
   let txs = block.transactions.map(tx => ({
-      _id: tx.hash,
-      index: tx.transactionIndex,
-      blockNumber: block.number,
-      value: tx.value,
-      to: tx.to,
-      nonce: tx.nonce,
-      gasPrice: tx.gasPrice,
-      gas: tx.gas,
-      from: tx.from
-    })
+    _id: tx.hash,
+    index: tx.transactionIndex,
+    blockNumber: block.number,
+    value: tx.value,
+    to: tx.to,
+    nonce: tx.nonce,
+    gasPrice: tx.gasPrice,
+    gas: tx.gas,
+    from: tx.from
+  })
   );
 
   const logs = _.chain(block.transactions)
     .map(tx => tx.logs.map(log => ({
-        _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
-        blockNumber: block.number,
-        txIndex: log.transactionIndex,
-        index: log.logIndex,
-        removed: log.removed,
-        signature: _.get(log, 'topics.0'), //0 topic
-        topics: log.topics,
-        address: log.address,
-      })
-      )
+      _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
+      blockNumber: block.number,
+      txIndex: log.transactionIndex,
+      index: log.logIndex,
+      removed: log.removed,
+      signature: _.get(log, 'topics.0'), //0 topic
+      topics: log.topics,
+      address: log.address,
+    })
+    )
     )
     .flattenDeep()
     .value();
@@ -100,7 +100,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
 
   if (removePending) {
     log.info('removing confirmed / rejected txs');
-    await removeOutDated();
+    await removeUnconfirmedTxs();
   }
 
   let blockToSave = {
@@ -127,23 +127,5 @@ const rollbackStateFromBlock = async (block) => {
   await models.blockModel.remove({number: block.number});
 };
 
-const removeOutDated = async () => {
-
-  let web3 = await providerService.get();
-
-  const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
-
-  if (!_.get(pendingBlock, 'transactions', []).length)
-    return;
-
-  if (pendingBlock.transactions.length)
-    await models.txModel.remove({
-      _id: {
-        $nin: pendingBlock.transactions
-      },
-      blockNumber: -1
-    });
-
-};
 
 module.exports = addBlock;

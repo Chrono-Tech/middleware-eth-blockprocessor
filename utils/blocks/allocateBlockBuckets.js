@@ -6,10 +6,10 @@
 
 const _ = require('lodash'),
   bunyan = require('bunyan'),
-  providerService = require('../services/providerService'),
+  providerService = require('../../services/providerService'),
   Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app.utils.allocateBlockBuckets'}),
-  models = require('../models');
+  models = require('../../models');
 
 const blockValidator = async (minBlock, maxBlock, chunkSize) => {
 

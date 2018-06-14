@@ -5,7 +5,7 @@
  */
 
 const bunyan = require('bunyan'),
-  models = require('../models'),
+  models = require('../../models'),
   log = bunyan.createLogger({name: 'app.utils.addUnconfirmedTx'});
 
 /**

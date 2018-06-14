@@ -75,7 +75,7 @@ class providerService {
     if (_.get(this.connector.currentProvider, 'connection')) {
       this.connector.currentProvider.connection.on('end', () => this.resetConnector());
       this.connector.currentProvider.connection.on('error', () => this.resetConnector());
-    } else {
+    } else 
       this.pingIntervalId = setInterval(async () => {
 
         const isConnected = await new Promise((res, rej) => {
@@ -92,7 +92,7 @@ class providerService {
           this.resetConnector();
         }
       }, 5000);
-    }
+    
 
     this.filter = this.connector.eth.filter('pending');
     this.filter.watch((err, result) => {

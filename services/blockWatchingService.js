@@ -10,11 +10,12 @@ const config = require('../config'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   blockWatchingInterface = require('middleware-common-components/interfaces/blockProcessor/blockWatchingServiceInterface'),
-  addBlock = require('../utils/addBlock'),
+  addBlock = require('../utils/blocks/addBlock'),
   models = require('../models'),
   providerService = require('../services/providerService'),
-  addUnconfirmedTx = require('../utils/addUnconfirmedTx'),
-  getBlock = require('../utils/getBlock'),
+  addUnconfirmedTx = require('../utils/txs/addUnconfirmedTx'),
+  removeUnconfirmedTxs = require('../utils/txs/removeUnconfirmedTxs'),
+  getBlock = require('../utils/blocks/getBlock'),
   log = bunyan.createLogger({name: 'app.services.blockCacheService'});
 
 /**
@@ -42,7 +43,7 @@ class BlockWatchingService {
     const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
 
     if (!pendingBlock)
-      await models.txModel.remove({blockNumber: -1});
+      await removeUnconfirmedTxs();
 
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.lastBlockHash = null;
