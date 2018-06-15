@@ -10,6 +10,7 @@ const bunyan = require('bunyan'),
   Web3 = require('web3'),
   sem = require('semaphore')(1),
   net = require('net'),
+  providerServiceInterface = require('middleware-common-components/interfaces/blockProcessor/providerServiceInterface'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
@@ -74,7 +75,7 @@ class providerService {
     if (_.get(this.connector.currentProvider, 'connection')) {
       this.connector.currentProvider.connection.on('end', () => this.resetConnector());
       this.connector.currentProvider.connection.on('error', () => this.resetConnector());
-    } else {
+    } else 
       this.pingIntervalId = setInterval(async () => {
 
         const isConnected = await new Promise((res, rej) => {
@@ -91,7 +92,7 @@ class providerService {
           this.resetConnector();
         }
       }, 5000);
-    }
+    
 
     this.filter = this.connector.eth.filter('pending');
     this.filter.watch((err, result) => {
@@ -120,4 +121,4 @@ class providerService {
 
 }
 
-module.exports = new providerService();
+module.exports = providerServiceInterface(new providerService());

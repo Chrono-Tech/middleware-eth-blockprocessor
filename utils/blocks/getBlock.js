@@ -5,7 +5,7 @@
  */
 
 const Promise = require('bluebird'),
-  providerService = require('../services/providerService'),
+  providerService = require('../../services/providerService'),
   _ = require('lodash');
 
 module.exports = async (blockNumber) => {
