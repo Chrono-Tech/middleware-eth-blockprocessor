@@ -9,12 +9,13 @@ const config = require('../config'),
   _ = require('lodash'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
-  addBlock = require('../utils/addBlock'),
-  blockModel = require('../models/blockModel'),
-  txModel = require('../models/txModel'),
+  blockWatchingInterface = require('middleware-common-components/interfaces/blockProcessor/blockWatchingServiceInterface'),
+  addBlock = require('../utils/blocks/addBlock'),
+  models = require('../models'),
   providerService = require('../services/providerService'),
-  addUnconfirmedTx = require('../utils/addUnconfirmedTx'),
-  getBlock = require('../utils/getBlock'),
+  addUnconfirmedTx = require('../utils/txs/addUnconfirmedTx'),
+  removeUnconfirmedTxs = require('../utils/txs/removeUnconfirmedTxs'),
+  getBlock = require('../utils/blocks/getBlock'),
   log = bunyan.createLogger({name: 'app.services.blockCacheService'});
 
 /**
@@ -30,7 +31,6 @@ class BlockWatchingService {
     this.events = new EventEmitter();
     this.currentHeight = currentHeight;
     this.isSyncing = false;
-
   }
 
   async startSync () {
@@ -43,7 +43,7 @@ class BlockWatchingService {
     const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
 
     if (!pendingBlock)
-      await txModel.remove({blockNumber: -1});
+      await removeUnconfirmedTxs();
 
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.lastBlockHash = null;
@@ -74,7 +74,7 @@ class BlockWatchingService {
         }
 
         if (_.get(err, 'code') === 1) {
-          const currentBlock = await blockModel.find({
+          const currentBlock = await models.blockModel.find({
             number: {$gte: 0}
           }).sort({number: -1}).limit(2);
           this.lastBlockHash = _.get(currentBlock, '1._id');
@@ -129,7 +129,7 @@ class BlockWatchingService {
 
 
     if (_.get(lastBlock, 'hash') && this.lastBlockHash) {
-      let savedBlock = await blockModel.count({_id: lastBlock.hash});
+      let savedBlock = await models.blockModel.count({_id: lastBlock.hash});
 
       if (!savedBlock)
         return Promise.reject({code: 1});
@@ -149,4 +149,6 @@ class BlockWatchingService {
 
 }
 
-module.exports = BlockWatchingService;
+module.exports = function (...args) {
+  return blockWatchingInterface(new BlockWatchingService(...args));
+};

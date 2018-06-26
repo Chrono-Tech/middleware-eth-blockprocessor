@@ -5,7 +5,7 @@
  */
 
 const bunyan = require('bunyan'),
-  txModel = require('../models/txModel'),
+  models = require('../../models'),
   log = bunyan.createLogger({name: 'app.utils.addUnconfirmedTx'});
 
 /**
@@ -31,6 +31,6 @@ module.exports = async (tx) => {
   };
 
   log.info(`inserting unconfirmed tx ${tx._id}`);
-  await txModel.create(tx);
+  await models.txModel.create(tx);
 
 };

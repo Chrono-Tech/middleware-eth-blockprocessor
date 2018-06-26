@@ -6,19 +6,18 @@
 
 const bunyan = require('bunyan'),
   _ = require('lodash'),
-  providerService = require('../services/providerService'),
+  removeUnconfirmedTxs = require('../txs/removeUnconfirmedTxs'),
   crypto = require('crypto'),
   sem = require('semaphore')(3),
   Promise = require('bluebird'),
-  blockModel = require('../models/blockModel'),
-  txModel = require('../models/txModel'),
-  txLogModel = require('../models/txLogModel'),
+  models = require('../../models'),
   log = bunyan.createLogger({name: 'app.services.addBlock'});
 
 /**
  * @service
  * @description filter txs by registered addresses
- * @param block - an array of txs
+ * @param block - the block object
+ * @param removePending - remove unconfirmed txs, which has been pulled from mempool
  * @returns {Promise.<*>}
  */
 
@@ -45,30 +44,30 @@ const addBlock = async (block, removePending = false) => {
 const updateDbStateWithBlock = async (block, removePending) => {
 
   let txs = block.transactions.map(tx => ({
-      _id: tx.hash,
-      index: tx.transactionIndex,
-      blockNumber: block.number,
-      value: tx.value,
-      to: tx.to,
-      nonce: tx.nonce,
-      gasPrice: tx.gasPrice,
-      gas: tx.gas,
-      from: tx.from
-    })
+    _id: tx.hash,
+    index: tx.transactionIndex,
+    blockNumber: block.number,
+    value: tx.value,
+    to: tx.to,
+    nonce: tx.nonce,
+    gasPrice: tx.gasPrice,
+    gas: tx.gas,
+    from: tx.from
+  })
   );
 
   const logs = _.chain(block.transactions)
     .map(tx => tx.logs.map(log => ({
-        _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
-        blockNumber: block.number,
-        txIndex: log.transactionIndex,
-        index: log.logIndex,
-        removed: log.removed,
-        signature: _.get(log, 'topics.0'), //0 topic
-        topics: log.topics,
-        address: log.address,
-      })
-      )
+      _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
+      blockNumber: block.number,
+      txIndex: log.transactionIndex,
+      index: log.logIndex,
+      removed: log.removed,
+      signature: _.get(log, 'topics.0'), //0 topic
+      topics: log.topics,
+      address: log.address,
+    })
+    )
     )
     .flattenDeep()
     .value();
@@ -83,7 +82,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
       }
     }));
 
-    await txModel.bulkWrite(bulkOps);
+    await models.txModel.bulkWrite(bulkOps);
   }
 
   log.info(`inserting ${logs.length} logs`);
@@ -96,12 +95,12 @@ const updateDbStateWithBlock = async (block, removePending) => {
       }
     }));
 
-    await txLogModel.bulkWrite(bulkOps);
+    await models.txLogModel.bulkWrite(bulkOps);
   }
 
   if (removePending) {
     log.info('removing confirmed / rejected txs');
-    await removeOutDated();
+    await removeUnconfirmedTxs();
   }
 
   let blockToSave = {
@@ -112,39 +111,21 @@ const updateDbStateWithBlock = async (block, removePending) => {
     timestamp: block.timestamp
   };
 
-  await blockModel.update({_id: blockToSave._id}, blockToSave, {upsert: true});
+  await models.blockModel.update({_id: blockToSave._id}, blockToSave, {upsert: true});
 
 };
 
 const rollbackStateFromBlock = async (block) => {
 
   log.info('rolling back txs state');
-  await txModel.remove({blockNumber: block.number});
+  await models.txModel.remove({blockNumber: block.number});
 
   log.info('rolling back tx logs state');
-  await txLogModel.remove({blockNumber: block.number});
+  await models.txLogModel.remove({blockNumber: block.number});
 
   log.info('rolling back blocks state');
-  await blockModel.remove({number: block.number});
+  await models.blockModel.remove({number: block.number});
 };
 
-const removeOutDated = async () => {
-
-  let web3 = await providerService.get();
-
-  const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
-
-  if (!_.get(pendingBlock, 'transactions', []).length)
-    return;
-
-  if (pendingBlock.transactions.length)
-    await txModel.remove({
-      _id: {
-        $nin: pendingBlock.transactions
-      },
-      blockNumber: -1
-    });
-
-};
 
 module.exports = addBlock;

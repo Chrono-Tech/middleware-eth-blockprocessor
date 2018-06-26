@@ -10,7 +10,7 @@
  */
 
 const _ = require('lodash'),
-  accountModel = require('../models/accountModel');
+  models = require('../models');
 
 module.exports = async (txs) => {
 
@@ -48,7 +48,7 @@ module.exports = async (txs) => {
     ]
   };
 
-  let accounts = await accountModel.find(query);
+  let accounts = await models.accountModel.find(query);
 
   accounts = _.chain(accounts)
     .map(account => [..._.keys(account.erc20token), account.address])

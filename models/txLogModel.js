@@ -27,4 +27,5 @@ const TxLog = new mongoose.Schema({
 TxLog.index({blockNumber: 1, txIndex: 1, index: 1});
 
 
-module.exports = mongoose.model(`${config.mongo.data.collectionPrefix}TxLog`, TxLog);
+module.exports = () =>
+  mongoose.model(`${config.mongo.data.collectionPrefix}TxLog`, TxLog);

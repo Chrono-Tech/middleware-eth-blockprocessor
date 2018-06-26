@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
+    "middleware-common-components": "github:ChronoBank/middleware-common-components",
     "amqplib": "^0.5.1",
     "bluebird": "^3.5.0",
     "bunyan": "^1.8.10",
     "dotenv": "^4.0.0",
+    "implement-js": "0.0.26",
     "lodash": "^4.17.4",
     "mongoose": "^4.11.11",
     "mongoose-long": "^0.1.1",
