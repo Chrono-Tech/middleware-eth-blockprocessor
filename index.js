@@ -14,6 +14,7 @@ const mongoose = require('mongoose'),
   MasterNodeService = require('middleware-common-components/services/blockProcessor/MasterNodeService'),
   Promise = require('bluebird'),
   _ = require('lodash'),
+  providerService = require('./services/providerService'),
   BlockWatchingService = require('./services/blockWatchingService'),
   SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
@@ -29,7 +30,7 @@ mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri, {useMon
 const init = async () => {
 
   [mongoose.accounts, mongoose.connection].forEach(connection =>
-    connection.on('disconnected', ()=> {
+    connection.on('disconnected', () => {
       throw new Error('mongo disconnected!');
     })
   );
@@ -45,9 +46,26 @@ const init = async () => {
   });
 
   await channel.assertExchange('events', 'topic', {durable: false});
+  await channel.assertExchange('internal', 'topic', {durable: false});
+  await channel.assertQueue(`${config.rabbit.serviceName}_current_provider.get`, {durable: false});
+  await channel.bindQueue(`${config.rabbit.serviceName}_current_provider.get`, 'internal', `${config.rabbit.serviceName}_current_provider.get`);
+
 
   const masterNodeService = new MasterNodeService(channel, config.rabbit.serviceName);
   await masterNodeService.start();
+
+  providerService.events.on('provider_set', providerURI => {
+    let providerIndex = _.findIndex(config.web3.providers, providerURI);
+    if (providerIndex !== -1)
+      channel.publish('internal', `${config.rabbit.serviceName}_current_provider.set`, new Buffer(JSON.stringify({index: providerIndex})));
+  });
+
+  channel.consume(`${config.rabbit.serviceName}_current_provider.get`, async () => {
+    let providerInstance = await providerService.get();
+    let providerIndex = _.findIndex(config.web3.providers, provider => provider.http === providerInstance.http);
+    if (providerIndex !== -1)
+      channel.publish('internal', `${config.rabbit.serviceName}_current_provider.set`, new Buffer(JSON.stringify({index: providerIndex})));
+  }, {noAck: true});
 
   const syncCacheService = new SyncCacheService();
 

@@ -100,6 +100,7 @@ class providerService {
         this.events.emit('unconfirmedTx', result);
     });
 
+    this.events.emit('provider_set');
     return this.connector;
 
   }
