@@ -15,13 +15,14 @@ const mongoose = require('mongoose'),
   BigNumber = require('bignumber.js'),
   config = require('../config');
 
-const setArgs = topics => {
+const setArgs = function (topics) {
   _.pullAt(topics, 0);
   return topics.map(topic => {
     let bn = BigNumber(topic, 16);
     return {
       c: bn.c,
-      e: bn.e
+      e: bn.e,
+      data: !topic.includes('0x')
     }
   });
 };

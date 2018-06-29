@@ -58,6 +58,14 @@ const updateDbStateWithBlock = async (block, removePending) => {
 
   const logs = _.chain(block.transactions)
     .map(tx => tx.logs.map(log => {
+
+
+        let args = log.topics;
+        let nonIndexedLogs = _.chain(log.data.replace('0x', '')).chunk(64).map(chunk => chunk.join('')).value();
+
+        if (args.length && nonIndexedLogs.length)
+          args.push(...nonIndexedLogs);
+
         const txLog = new models.txLogModel({
           blockNumber: block.number,
           txIndex: log.transactionIndex,
