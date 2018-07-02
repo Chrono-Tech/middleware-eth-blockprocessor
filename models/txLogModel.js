@@ -17,12 +17,12 @@ const mongoose = require('mongoose'),
 
 const setArgs = function (topics) {
   _.pullAt(topics, 0);
-  return topics.map(topic => {
+  return topics.map((topic, index) => {
     let bn = BigNumber(topic, 16);
     return {
-      c: bn.c,
       e: bn.e,
-      data: !topic.includes('0x')
+      c: bn.c,
+      index: index
     }
   });
 };
@@ -49,11 +49,13 @@ const TxLog = new mongoose.Schema({
   removed: {type: Boolean},
   signature: {type: String},
   args: {type: Array, default: [], set: setArgs, get: getArgs},
+  dataIndexStart: {type: Number},
   address: {type: String, index: true}
 }, {_id: false});
 
 TxLog.index({blockNumber: 1, txIndex: 1, index: 1});
-TxLog.index({signature: 1, 'args.c': 1, 'args.e': 1}, {sparse: true});
+TxLog.index({signature: 1});
+TxLog.index({'args.e': 1, 'args.c': 1, 'args.index': 1}, {sparse: true});
 
 
 module.exports = () =>

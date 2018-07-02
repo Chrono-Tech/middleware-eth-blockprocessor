@@ -62,9 +62,13 @@ const updateDbStateWithBlock = async (block, removePending) => {
 
         let args = log.topics;
         let nonIndexedLogs = _.chain(log.data.replace('0x', '')).chunk(64).map(chunk => chunk.join('')).value();
+        let dataIndexStart;
 
-        if (args.length && nonIndexedLogs.length)
+        if (args.length && nonIndexedLogs.length) {
+          dataIndexStart = args.length;
           args.push(...nonIndexedLogs);
+        }
+
 
         const txLog = new models.txLogModel({
           blockNumber: block.number,
@@ -73,6 +77,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
           removed: log.removed,
           signature: _.get(log, 'topics.0'),
           args: log.topics,
+          dataIndexStart: dataIndexStart,
           address: log.address
         });
 
