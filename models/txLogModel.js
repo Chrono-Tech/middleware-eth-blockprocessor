@@ -11,20 +11,51 @@
  */
 
 const mongoose = require('mongoose'),
+  _ = require('lodash'),
+  BigNumber = require('bignumber.js'),
   config = require('../config');
+
+const setArgs = function (topics) {
+  _.pullAt(topics, 0);
+  return topics.map((topic, index) => {
+    let bn = BigNumber(topic, 16);
+    return {
+      e: bn.e,
+      c: bn.c,
+      index: index
+    }
+  });
+};
+
+
+const getArgs = topics => {
+  return topics.map(topic => {
+    let bn = BigNumber();
+    bn.s = 1;
+    bn.c = topic.c;
+    bn.e = topic.e;
+    topic = bn.toString('16');
+    while (topic.length < 64)
+      topic = '0' + topic;
+    return '0x' + topic;
+  });
+};
 
 const TxLog = new mongoose.Schema({
   _id: {type: String},
   blockNumber: {type: Number, required: true, default: -1},
-  txIndex: {type: Number, required: true, default: Date.now},
+  txIndex: {type: Number, required: true},
   index: {type: Number},
   removed: {type: Boolean},
-  signature: {type: String, index: true}, //0 topic
-  topics: {type: Array, default: []},
+  signature: {type: String},
+  args: {type: Array, default: [], set: setArgs, get: getArgs},
+  dataIndexStart: {type: Number},
   address: {type: String, index: true}
 }, {_id: false});
 
 TxLog.index({blockNumber: 1, txIndex: 1, index: 1});
+TxLog.index({signature: 1});
+TxLog.index({'args.e': 1, 'args.c': 1, 'args.index': 1}, {sparse: true});
 
 
 module.exports = () =>

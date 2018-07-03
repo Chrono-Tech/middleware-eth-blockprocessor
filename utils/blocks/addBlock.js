@@ -44,30 +44,46 @@ const addBlock = async (block, removePending = false) => {
 const updateDbStateWithBlock = async (block, removePending) => {
 
   let txs = block.transactions.map(tx => ({
-    _id: tx.hash,
-    index: tx.transactionIndex,
-    blockNumber: block.number,
-    value: tx.value,
-    to: tx.to,
-    nonce: tx.nonce,
-    gasPrice: tx.gasPrice,
-    gas: tx.gas,
-    from: tx.from
-  })
+      _id: tx.hash,
+      index: tx.transactionIndex,
+      blockNumber: block.number,
+      value: tx.value,
+      to: tx.to,
+      nonce: tx.nonce,
+      gasPrice: tx.gasPrice,
+      gas: tx.gas,
+      from: tx.from
+    })
   );
 
   const logs = _.chain(block.transactions)
-    .map(tx => tx.logs.map(log => ({
-      _id: crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex'),
-      blockNumber: block.number,
-      txIndex: log.transactionIndex,
-      index: log.logIndex,
-      removed: log.removed,
-      signature: _.get(log, 'topics.0'), //0 topic
-      topics: log.topics,
-      address: log.address,
-    })
-    )
+    .map(tx => tx.logs.map(log => {
+
+
+        let args = log.topics;
+        let nonIndexedLogs = _.chain(log.data.replace('0x', '')).chunk(64).map(chunk => chunk.join('')).value();
+        let dataIndexStart;
+
+        if (args.length && nonIndexedLogs.length) {
+          dataIndexStart = args.length;
+          args.push(...nonIndexedLogs);
+        }
+
+
+        const txLog = new models.txLogModel({
+          blockNumber: block.number,
+          txIndex: log.transactionIndex,
+          index: log.logIndex,
+          removed: log.removed,
+          signature: _.get(log, 'topics.0'),
+          args: log.topics,
+          dataIndexStart: dataIndexStart,
+          address: log.address
+        });
+
+        txLog._id = crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex');
+        return txLog;
+      })
     )
     .flattenDeep()
     .value();
@@ -107,7 +123,7 @@ const updateDbStateWithBlock = async (block, removePending) => {
     _id: block.hash,
     number: block.number,
     uncleAmount: block.uncles.length,
-    totalTxFee: _.chain(block.transactions).map(tx=>tx.gasPrice * tx.gas).sum().value(),
+    totalTxFee: _.chain(block.transactions).map(tx => tx.gasPrice * tx.gas).sum().value(),
     timestamp: block.timestamp
   };
 

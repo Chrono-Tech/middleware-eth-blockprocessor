@@ -25,18 +25,18 @@ const bunyan = require('bunyan'),
 
 class SyncCacheService {
 
-  constructor () {
+  constructor() {
     this.events = new EventEmitter();
   }
 
-  async start () {
+  async start() {
     await this.indexCollection();
     let data = await allocateBlockBuckets();
     this.doJob(data.missedBuckets);
     return data.height;
   }
 
-  async indexCollection () {
+  async indexCollection() {
     log.info('indexing...');
     await models.blockModel.init();
     await models.txModel.init();
@@ -44,11 +44,22 @@ class SyncCacheService {
     log.info('indexation completed!');
   }
 
-  async doJob (buckets) {
+  async doJob(buckets) {
 
     while (buckets.length)
       try {
         for (let bucket of buckets) {
+
+          if (bucket.length === 2 && bucket.length !== (_.last(bucket) > bucket[0] ? _.last(bucket) - bucket[0] : bucket[0] - _.last(bucket)) + 1) {
+
+            let blocksToProcess = [];
+            for (let blockNumber = _.last(bucket); blockNumber >= bucket[0]; blockNumber--)
+              blocksToProcess.push(blockNumber);
+
+            _.pullAll(bucket, bucket);
+            bucket.push(...blocksToProcess);
+          }
+
           await this.runPeer(bucket);
           if (!bucket.length)
             _.pull(buckets, bucket);
@@ -64,7 +75,7 @@ class SyncCacheService {
 
   }
 
-  async runPeer (bucket) {
+  async runPeer(bucket) {
 
     let web3 = await providerService.get();
 
@@ -76,14 +87,10 @@ class SyncCacheService {
 
     log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
 
-    let blocksToProcess = [];
-    for(let blockNumber = _.last(bucket); blockNumber >= bucket[0]; blockNumber--)
-      blocksToProcess.push(blockNumber);
-
-    await Promise.mapSeries(blocksToProcess, async (blockNumber) => {
+    await Promise.mapSeries(bucket, async (blockNumber) => {
       const block = await getBlock(blockNumber);
-
       await addBlock(block);
+
       _.pull(bucket, blockNumber);
       this.events.emit('block', block);
     });
