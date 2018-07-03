@@ -14,13 +14,12 @@ const bunyan = require('bunyan'),
   log = bunyan.createLogger({name: 'app.services.addBlock'});
 
 /**
- * @service
- * @description filter txs by registered addresses
- * @param block - the block object
- * @param removePending - remove unconfirmed txs, which has been pulled from mempool
+ * @function
+ * @description add block to the cache
+ * @param block - prepared block with full txs
+ * @param removePending - remove pending transactions
  * @returns {Promise.<*>}
  */
-
 const addBlock = async (block, removePending = false) => {
 
   return new Promise((res, rej) => {
@@ -41,6 +40,13 @@ const addBlock = async (block, removePending = false) => {
 
 };
 
+/**
+ * @function
+ * @description add new block, txs and txlogs to the cache
+ * @param block
+ * @param removePending
+ * @return {Promise<void>}
+ */
 const updateDbStateWithBlock = async (block, removePending) => {
 
   let txs = block.transactions.map(tx => ({
@@ -131,6 +137,12 @@ const updateDbStateWithBlock = async (block, removePending) => {
 
 };
 
+/**
+ * @function
+ * @description rollback the cache to previous block
+ * @param block - current block
+ * @return {Promise<void>}
+ */
 const rollbackStateFromBlock = async (block) => {
 
   log.info('rolling back txs state');

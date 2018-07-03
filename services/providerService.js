@@ -17,9 +17,8 @@ const bunyan = require('bunyan'),
 
 /**
  * @service
- * @description filter txs by registered addresses
- * @param block - an array of txs
- * @returns {Promise.<*>}
+ * @description the service for handling connection to node
+ * @returns Object<ProviderService>
  */
 
 class providerService {
@@ -35,6 +34,12 @@ class providerService {
       }, 60000 * 5);
   }
 
+  /**
+   * @function
+   * @description build web3 instance from provided URI
+   * @param providerURI - the connection uri
+   * @return {Web3}
+   */
   makeWeb3FromProviderURI (providerURI) {
 
     const provider = /^http/.test(providerURI) ?
@@ -46,12 +51,21 @@ class providerService {
     return web3;
   }
 
+  /** @function
+   * @description reset the current connection
+   * @return {Promise<void>}
+   */
   async resetConnector () {
     await this.connector.reset();
     this.switchConnector();
     this.events.emit('disconnected');
   }
 
+  /**
+   * @function
+   * @description choose the connector
+   * @return {Promise<null|*>}
+   */
   async switchConnector () {
 
     const providerURI = await Promise.any(config.web3.providers.map(async providerURI => {
@@ -105,6 +119,11 @@ class providerService {
 
   }
 
+  /**
+   * @function
+   * @description safe connector switching, by moving requests to
+   * @return {Promise<bluebird>}
+   */
   async switchConnectorSafe () {
 
     return new Promise(res => {
@@ -116,6 +135,11 @@ class providerService {
     });
   }
 
+  /**
+   * @function
+   * @description
+   * @return {Promise<*|bluebird>}
+   */
   async get () {
     return this.connector && this.connector.isConnected() ? this.connector : await this.switchConnectorSafe();
   }
