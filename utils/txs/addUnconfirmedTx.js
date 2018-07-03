@@ -9,9 +9,9 @@ const bunyan = require('bunyan'),
   log = bunyan.createLogger({name: 'app.utils.addUnconfirmedTx'});
 
 /**
- * @service
- * @description filter txs by registered addresses
- * @param tx - transaction
+ * @function
+ * @description add unconfirmed tx to cache
+ * @param tx - unconfirmed transaction
  * @returns {Promise.<*>}
  */
 

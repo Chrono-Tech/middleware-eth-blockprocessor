@@ -5,8 +5,8 @@
  */
 
 /**
- * Mongoose model. Represents a block in eth
- * @module models/blockModel
+ * Mongoose model. Represents a txLog (transactions's log) in eth
+ * @module models/txLogModel
  * @returns {Object} Mongoose model
  */
 
@@ -15,6 +15,14 @@ const mongoose = require('mongoose'),
   BigNumber = require('bignumber.js'),
   config = require('../config');
 
+
+/**
+ * @function
+ * @description setter for args. Args - are encoded topics
+ * and data in bignumber format
+ * @param topics - array of topics in hex format
+ * @return {*}
+ */
 const setArgs = function (topics) {
   _.pullAt(topics, 0);
   return topics.map((topic, index) => {
@@ -27,7 +35,12 @@ const setArgs = function (topics) {
   });
 };
 
-
+/**
+ * @function
+ * @description the function for decoding the args to topics (in hex format)
+ * @param topics - encoded topics in bignumber format
+ * @return {*}
+ */
 const getArgs = topics => {
   return topics.map(topic => {
     let bn = BigNumber();

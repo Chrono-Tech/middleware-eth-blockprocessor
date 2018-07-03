@@ -8,6 +8,12 @@ const Promise = require('bluebird'),
   providerService = require('../../services/providerService'),
   _ = require('lodash');
 
+/**
+ * @function
+ * @description get block from the node
+ * @param blockNumber
+ * @return {Promise<*>}
+ */
 module.exports = async (blockNumber) => {
 
   /**

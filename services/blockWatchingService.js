@@ -20,9 +20,9 @@ const config = require('../config'),
 
 /**
  * @service
- * @description filter txs by registered addresses
- * @param block - an array of txs
- * @returns {Promise.<*>}
+ * @description the service is watching for the recent blocks and transactions (including unconfirmed)
+ * @param currentHeight - the current blockchain's height
+ * @returns Object<BlockWatchingService>
  */
 
 class BlockWatchingService {
@@ -33,6 +33,10 @@ class BlockWatchingService {
     this.isSyncing = false;
   }
 
+  /**function
+   * @description start sync process
+   * @return {Promise<void>}
+   */
   async startSync () {
     if (this.isSyncing)
       return;
@@ -54,6 +58,11 @@ class BlockWatchingService {
 
   }
 
+  /**
+   * @function
+   * start block watching
+   * @return {Promise<void>}
+   */
   async doJob () {
     while (this.isSyncing)
       try {
@@ -95,6 +104,12 @@ class BlockWatchingService {
 
   }
 
+  /**
+   * @function
+   * @description process unconfirmed tx
+   * @param tx - the encoded raw transaction
+   * @return {Promise<void>}
+   */
   async unconfirmedTxEvent (result) {
 
     let web3 = await providerService.get();
@@ -110,12 +125,22 @@ class BlockWatchingService {
 
   }
 
+  /**
+   * @function
+   * @description stop the sync process
+   * @return {Promise<void>}
+   */
   async stopSync () {
     this.isSyncing = false;
     providerService.events.removeListener('unconfirmedTx', this.unconfirmedTxEventCallback);
 
   }
 
+  /**
+   * @function
+   * @description process the next block from the current height
+   * @return {Promise<*>}
+   */
   async processBlock () {
 
     let web3 = await providerService.get();
@@ -138,13 +163,7 @@ class BlockWatchingService {
     if (!lastBlock && this.lastBlockHash)
       return Promise.reject({code: 1});
 
-    /**
-     * Get raw block
-     * @type {Object}
-     */
-
     return await getBlock(this.currentHeight);
-
   }
 
 }

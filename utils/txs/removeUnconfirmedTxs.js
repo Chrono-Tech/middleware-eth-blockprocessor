@@ -3,6 +3,11 @@ const providerService = require('../../services/providerService'),
   _ = require('lodash'),
   models = require('../../models');
 
+/**
+ * @function
+ * @description remove unconfirmed transactions, which has been pulled from mempool
+ * @return {Promise<void>}
+ */
 module.exports = async () => {
 
   let web3 = await providerService.get();
