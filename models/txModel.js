@@ -5,8 +5,8 @@
  */
 
 /**
- * Mongoose model. Represents a block in eth
- * @module models/blockModel
+ * Mongoose model. Represents a transaction in eth
+ * @module models/txModel
  * @returns {Object} Mongoose model
  */
 

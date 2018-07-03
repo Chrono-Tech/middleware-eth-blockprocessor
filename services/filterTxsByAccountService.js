@@ -4,13 +4,15 @@
  * @author Egor Zuev <zyev.egor@gmail.com>
  */
 
-/**
- * Transaction filter
- * @module services/filterTxsByAccount
- */
-
 const _ = require('lodash'),
   models = require('../models');
+
+/**
+ * @service
+ * @description filter txs by registered addresses
+ * @param txs - an array of txs
+ * @returns {Promise.<*>}
+ */
 
 module.exports = async (txs) => {
 
