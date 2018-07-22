@@ -10,15 +10,15 @@ const bunyan = require('bunyan'),
   Web3 = require('web3'),
   sem = require('semaphore')(1),
   net = require('net'),
+  providerServiceInterface = require('middleware-common-components/interfaces/blockProcessor/providerServiceInterface'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
   log = bunyan.createLogger({name: 'app.services.syncCacheService'});
 
 /**
  * @service
- * @description filter txs by registered addresses
- * @param block - an array of txs
- * @returns {Promise.<*>}
+ * @description the service for handling connection to node
+ * @returns Object<ProviderService>
  */
 
 class providerService {
@@ -34,6 +34,12 @@ class providerService {
       }, 60000 * 5);
   }
 
+  /**
+   * @function
+   * @description build web3 instance from provided URI
+   * @param providerURI - the connection uri
+   * @return {Web3}
+   */
   makeWeb3FromProviderURI (providerURI) {
 
     const provider = /^http/.test(providerURI) ?
@@ -45,12 +51,21 @@ class providerService {
     return web3;
   }
 
+  /** @function
+   * @description reset the current connection
+   * @return {Promise<void>}
+   */
   async resetConnector () {
     await this.connector.reset();
     this.switchConnector();
     this.events.emit('disconnected');
   }
 
+  /**
+   * @function
+   * @description choose the connector
+   * @return {Promise<null|*>}
+   */
   async switchConnector () {
 
     const providerURI = await Promise.any(config.web3.providers.map(async providerURI => {
@@ -74,7 +89,7 @@ class providerService {
     if (_.get(this.connector.currentProvider, 'connection')) {
       this.connector.currentProvider.connection.on('end', () => this.resetConnector());
       this.connector.currentProvider.connection.on('error', () => this.resetConnector());
-    } else {
+    } else 
       this.pingIntervalId = setInterval(async () => {
 
         const isConnected = await new Promise((res, rej) => {
@@ -91,7 +106,7 @@ class providerService {
           this.resetConnector();
         }
       }, 5000);
-    }
+    
 
     this.filter = this.connector.eth.filter('pending');
     this.filter.watch((err, result) => {
@@ -99,10 +114,16 @@ class providerService {
         this.events.emit('unconfirmedTx', result);
     });
 
+    this.events.emit('provider_set');
     return this.connector;
 
   }
 
+  /**
+   * @function
+   * @description safe connector switching, by moving requests to
+   * @return {Promise<bluebird>}
+   */
   async switchConnectorSafe () {
 
     return new Promise(res => {
@@ -114,10 +135,15 @@ class providerService {
     });
   }
 
+  /**
+   * @function
+   * @description
+   * @return {Promise<*|bluebird>}
+   */
   async get () {
     return this.connector && this.connector.isConnected() ? this.connector : await this.switchConnectorSafe();
   }
 
 }
 
-module.exports = new providerService();
+module.exports = providerServiceInterface(new providerService());

@@ -4,8 +4,7 @@
  * @author Egor Zuev <zyev.egor@gmail.com>
  */
 
-const blockModel = require('../../models/blockModel'),
-  config = require('../../config'),
+const models = require('../../models'),
   _ = require('lodash'),
   Promise = require('bluebird');
 
@@ -14,7 +13,7 @@ module.exports = (web3) =>
     let check = async () => {
       let latestBlock = await Promise.promisify(web3.eth.getBlockNumber)();
       await Promise.delay(10000);
-      let currentBlock = await blockModel.find({}).sort('-number').limit(1);
+      let currentBlock = await models.blockModel.find({}).sort('-number').limit(1);
       _.get(currentBlock, '0.number', 0) > latestBlock - 10 ?
         res() : check();
     };

@@ -6,11 +6,19 @@
 
 const _ = require('lodash'),
   bunyan = require('bunyan'),
-  providerService = require('../services/providerService'),
+  providerService = require('../../services/providerService'),
   Promise = require('bluebird'),
   log = bunyan.createLogger({name: 'app.utils.allocateBlockBuckets'}),
-  blockModel = require('../models/blockModel');
+  models = require('../../models');
 
+/**
+ * @function
+ * @description validate that all blocks in the specified range are exist in db
+ * @param minBlock - validate from block
+ * @param maxBlock - validate to block
+ * @param chunkSize - the chunk validation size
+ * @return {Promise<Array>}
+ */
 const blockValidator = async (minBlock, maxBlock, chunkSize) => {
 
   const data = [];
@@ -25,7 +33,7 @@ const blockValidator = async (minBlock, maxBlock, chunkSize) => {
       const minBlock = _.head(chunk);
       const maxBlock = _.last(chunk);
       log.info(`validating blocks from: ${minBlock} to ${maxBlock}`);
-      const count = await blockModel.count({
+      const count = await models.blockModel.count({
         number: minBlock === maxBlock ? minBlock : {
           $gte: minBlock,
           $lt: maxBlock

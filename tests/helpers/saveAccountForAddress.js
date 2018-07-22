@@ -3,7 +3,7 @@
  * Licensed under the AGPL Version 3 license.
  */
 
-const accountModel = require('../../models/accountModel');
+const models = require('../../models');
 module.exports = async (account) => {
-    return await new accountModel({address: account}).save();
+    return await new models.accountModel({address: account}).save();
 };
