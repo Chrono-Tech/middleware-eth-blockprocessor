@@ -19,51 +19,38 @@ module.exports = async (txs) => {
   if (!txs.length)
     return [];
 
-  let query = {
-    isActive: {$ne: false},
-    $or: [
-      {
-        address: {
-          $in: _.chain(txs)
-            .map(tx =>
-              _.union(tx.logs.map(log => log.address), [tx.to, tx.from])
-            )
-            .flattenDeep()
-            .uniq()
-            .value()
-        }
-      },
-      {
-        $or: _.chain(txs)
-          .map(tx =>
-            _.chain([tx.to, tx.from])
-              .transform((acc, val) => {
-                if (!val) return;
-                acc.push({[`erc20token.${val}`]: {$exists: true}});
-              })
-              .value()
-          )
-          .flattenDeep()
-          .uniqWith(_.isEqual)
-          .value()
-      }
-    ]
-  };
-
-  let accounts = await models.accountModel.find(query);
-
-  accounts = _.chain(accounts)
-    .map(account => [..._.keys(account.erc20token), account.address])
+  let addresses = _.chain(txs)
+    .map(tx =>
+      _.union(tx.logs.map(log => log.address), [tx.to, tx.from])
+    )
     .flattenDeep()
+    .uniq()
+    .chunk(100)
     .value();
 
-  return _.chain(txs)
-    .filter(tx => {
-      let emittedAccounts = _.union(tx.logs.map(log => log.address), [tx.to, tx.from]);
 
-      return _.find(accounts, account =>
-        emittedAccounts.includes(account)
-      );
+  let filteredByChunks = await Promise.all(addresses.map(chunk =>
+    models.accountModel.find({
+      address: {
+        $in: chunk
+      },
+      isActive: {
+        $ne: false
+      }
     })
+  ));
+
+  return _.chain(filteredByChunks)
+    .flatten()
+    .map(account => [..._.keys(account.erc20token), account.address])
+    .flattenDeep()
+    .uniq()
+    .map(address => ({
+        address: address,
+        txs: _.filter(txs, tx =>
+            _.union(tx.logs.map(log => log.address), [tx.to, tx.from]).includes(address)
+          )
+      })
+    )
     .value();
 };
