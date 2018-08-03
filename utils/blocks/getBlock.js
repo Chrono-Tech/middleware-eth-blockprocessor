@@ -31,7 +31,7 @@ module.exports = async (blockNumber) => {
   rawBlock.uncleAmount = rawBlock.uncles.length;
 
   if (!rawBlock.transactions.length) {
-    rawBlock.totalTxFee = 0;
+    rawBlock.totalTxFee = '0';
     return rawBlock;
   }
 

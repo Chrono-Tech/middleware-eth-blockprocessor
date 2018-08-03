@@ -14,7 +14,8 @@ const bunyan = require('bunyan'),
   getBlock = require('../utils/blocks/getBlock'),
   providerService = require('../services/providerService'),
   addBlock = require('../utils/blocks/addBlock'),
-  log = bunyan.createLogger({name: 'app.services.syncCacheService'});
+  config = require('../config'),
+  log = bunyan.createLogger({name: 'core.blockProcessor.services.syncCacheService', level: config.logs.level});
 
 /**
  * @service

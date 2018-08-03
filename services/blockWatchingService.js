@@ -8,6 +8,7 @@ const config = require('../config'),
   bunyan = require('bunyan'),
   _ = require('lodash'),
   Promise = require('bluebird'),
+  rollbackBlock = require('../utils/blocks/rollbackBlock'),
   EventEmitter = require('events'),
   blockWatchingInterface = require('middleware-common-components/interfaces/blockProcessor/blockWatchingServiceInterface'),
   addBlock = require('../utils/blocks/addBlock'),
@@ -16,7 +17,7 @@ const config = require('../config'),
   addUnconfirmedTx = require('../utils/txs/addUnconfirmedTx'),
   removeUnconfirmedTxs = require('../utils/txs/removeUnconfirmedTxs'),
   getBlock = require('../utils/blocks/getBlock'),
-  log = bunyan.createLogger({name: 'app.services.blockCacheService'});
+  log = bunyan.createLogger({name: 'core.blockProcessor.services.blockCacheService', level: config.logs.level});
 
 /**
  * @service
@@ -50,7 +51,6 @@ class BlockWatchingService {
       await removeUnconfirmedTxs();
 
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
-    this.lastBlockHash = null;
     this.doJob();
 
     this.unconfirmedTxEventCallback = result=> this.unconfirmedTxEvent(result).catch();
@@ -69,12 +69,8 @@ class BlockWatchingService {
         const block = await this.processBlock();
         await addBlock(block, true);
         this.currentHeight++;
-        this.lastBlockHash = block.hash;
         this.events.emit('block', block);
       } catch (err) {
-
-        if (err instanceof Promise.TimeoutError)
-          continue;
 
         if (_.get(err, 'code') === 0) {
           log.info(`await for next block ${this.currentHeight}`);
@@ -83,12 +79,9 @@ class BlockWatchingService {
         }
 
         if (_.get(err, 'code') === 1) {
-          const currentBlock = await models.blockModel.find({
-            number: {$gte: 0}
-          }).sort({number: -1}).limit(2);
-          this.lastBlockHash = _.get(currentBlock, '1._id');
-          this.currentHeight = _.get(currentBlock, '0.number', 0);
-
+          await rollbackBlock(this.currentHeight);
+          const currentBlock = await models.blockModel.findOne({number: {$gte: 0}}).sort({number: -1}).select('number');
+          this.currentHeight = _.get(currentBlock, 'number', 0);
           continue;
         }
 
@@ -107,13 +100,13 @@ class BlockWatchingService {
   /**
    * @function
    * @description process unconfirmed tx
-   * @param tx - the encoded raw transaction
+   * @param hash - the hash of transaction
    * @return {Promise<void>}
    */
-  async unconfirmedTxEvent (result) {
+  async unconfirmedTxEvent (hash) {
 
     let web3 = await providerService.get();
-    let tx = await Promise.promisify(web3.eth.getTransaction)(result);
+    let tx = await Promise.promisify(web3.eth.getTransaction)(hash);
 
     if (!_.has(tx, 'hash'))
       return;
@@ -153,15 +146,12 @@ class BlockWatchingService {
       await Promise.promisify(web3.eth.getBlock)(this.currentHeight - 1, false).timeout(60000).catch(() => null);
 
 
-    if (_.get(lastBlock, 'hash') && this.lastBlockHash) {
+    if (_.get(lastBlock, 'hash')) {
       let savedBlock = await models.blockModel.count({_id: lastBlock.hash});
 
       if (!savedBlock)
         return Promise.reject({code: 1});
     }
-
-    if (!lastBlock && this.lastBlockHash)
-      return Promise.reject({code: 1});
 
     return await getBlock(this.currentHeight);
   }

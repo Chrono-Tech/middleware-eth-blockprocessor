@@ -6,7 +6,9 @@
 
 const bunyan = require('bunyan'),
   models = require('../../models'),
-  log = bunyan.createLogger({name: 'app.utils.addUnconfirmedTx'});
+  config = require('../../config'),
+  sem = require('semaphore')(1),
+  log = bunyan.createLogger({name: 'core.blockProcessor.utils.addUnconfirmedTx', level: config.logs.level});
 
 /**
  * @function
@@ -15,7 +17,7 @@ const bunyan = require('bunyan'),
  * @returns {Promise.<*>}
  */
 
-module.exports = async (tx) => {
+const addTx = async (tx) => {
 
   tx = {
     _id: tx.hash,
@@ -32,5 +34,23 @@ module.exports = async (tx) => {
 
   log.info(`inserting unconfirmed tx ${tx._id}`);
   await models.txModel.create(tx);
+
+};
+
+
+module.exports = async (tx) => {
+
+  return await new Promise((res, rej) => {
+    sem.take(async () => {
+      try {
+        await addTx(tx);
+        res();
+      } catch (err) {
+        rej(err);
+      }
+
+      sem.leave();
+    });
+  });
 
 };
