@@ -10,8 +10,10 @@ const bunyan = require('bunyan'),
   crypto = require('crypto'),
   sem = require('semaphore')(3),
   Promise = require('bluebird'),
+  config = require('../../config'),
   models = require('../../models'),
-  log = bunyan.createLogger({name: 'app.services.addBlock'});
+  BigNumber = require('bignumber.js'),
+  log = bunyan.createLogger({name: 'core.blockProcessor.services.addBlock', level: config.logs.level});
 
 /**
  * @function
@@ -29,9 +31,7 @@ const addBlock = async (block, removePending = false) => {
         await updateDbStateWithBlock(block, removePending);
         res();
       } catch (err) {
-        log.error(err);
-        await rollbackStateFromBlock(block);
-        rej(err);
+        rej({code: 1});
       }
       sem.leave();
     });
@@ -63,9 +63,9 @@ const updateDbStateWithBlock = async (block, removePending) => {
   );
 
   const logs = _.chain(block.transactions)
-    .map(tx => tx.logs.map(log => {
+    .map(tx => tx.logs.map(origLog => {
 
-
+        const log = _.cloneDeep(origLog);
         let args = log.topics;
         let nonIndexedLogs = _.chain(log.data.replace('0x', '')).chunk(64).map(chunk => chunk.join('')).value();
         let dataIndexStart;
@@ -129,30 +129,13 @@ const updateDbStateWithBlock = async (block, removePending) => {
     _id: block.hash,
     number: block.number,
     uncleAmount: block.uncles.length,
-    totalTxFee: _.chain(block.transactions).map(tx => tx.gasPrice * tx.gas).sum().value(),
+    totalTxFee: _.chain(block.transactions).reduce((result, tx) =>
+        BigNumber(result).plus(BigNumber(tx.gasPrice).multipliedBy(tx.gas)).toString(),
+      '0').value().toString(),
     timestamp: block.timestamp
   };
 
   await models.blockModel.update({_id: blockToSave._id}, blockToSave, {upsert: true});
-
-};
-
-/**
- * @function
- * @description rollback the cache to previous block
- * @param block - current block
- * @return {Promise<void>}
- */
-const rollbackStateFromBlock = async (block) => {
-
-  log.info('rolling back txs state');
-  await models.txModel.remove({blockNumber: block.number});
-
-  log.info('rolling back tx logs state');
-  await models.txLogModel.remove({blockNumber: block.number});
-
-  log.info('rolling back blocks state');
-  await models.blockModel.remove({number: block.number});
 };
 
 

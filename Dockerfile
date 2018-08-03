@@ -17,7 +17,6 @@ RUN mkdir src && cd src && \
     middleware-eth-chrono-sc-processor"#$RELEASE" \
     middleware-eth-balance-processor"#$RELEASE" \
     middleware-eth-ipfs"#$RELEASE" \
-    middleware-eth-erc20"#$RELEASE" \
     middleware-eth-rest"#$RELEASE" \
     middleware-eth-nem-action-processor"#$RELEASE" \
     middleware-eth-2fa"#$RELEASE" \

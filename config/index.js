@@ -40,6 +40,9 @@ const config = {
         `${process.env.WEB3_URI || `/tmp/${(process.env.NETWORK || 'development')}/geth.ipc`}`
       ])
       .value()
+  },
+  logs: {
+    level: process.env.LOG_LEVEL || 'info'
   }
 };
 

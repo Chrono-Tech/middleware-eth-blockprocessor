@@ -13,7 +13,7 @@ const bunyan = require('bunyan'),
   providerServiceInterface = require('middleware-common-components/interfaces/blockProcessor/providerServiceInterface'),
   Promise = require('bluebird'),
   EventEmitter = require('events'),
-  log = bunyan.createLogger({name: 'app.services.syncCacheService'});
+  log = bunyan.createLogger({name: 'core.blockProcessor.services.syncCacheService', level: config.logs.level});
 
 /**
  * @service
