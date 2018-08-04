@@ -8,7 +8,8 @@ const _ = require('lodash'),
   bunyan = require('bunyan'),
   providerService = require('../../services/providerService'),
   Promise = require('bluebird'),
-  log = bunyan.createLogger({name: 'app.utils.allocateBlockBuckets'}),
+  config = require('../../config'),
+  log = bunyan.createLogger({name: 'core.blockProcessor.utils.allocateBlockBuckets', level: config.logs.level}),
   models = require('../../models');
 
 /**

@@ -4,17 +4,13 @@
   "main": "index.js",
   "dependencies": {
     "amqplib": "^0.5.1",
-    "big-number": "^1.0.0",
     "bignumber.js": "^7.2.1",
     "bluebird": "^3.5.0",
     "bunyan": "^1.8.10",
     "dotenv": "^4.0.0",
-    "implement-js": "0.0.26",
     "lodash": "^4.17.4",
     "middleware-common-components": "github:ChronoBank/middleware-common-components",
     "mongoose": "^4.11.11",
-    "mongoose-double": "0.0.1",
-    "mongoose-long": "^0.1.1",
     "require-all": "^2.2.0",
     "semaphore": "^1.1.0",
     "uniqid": "^4.1.1",
@@ -22,7 +18,7 @@
   },
   "scripts": {
     "lint": "node ./node_modules/eslint/bin/eslint.js -c .eslintrc.js --ext .js --fix --ignore-path .eslintignore .",
-    "test": "node ./node_modules/mocha/bin/mocha -t 90000 tests",
+    "test": "node ./node_modules/mocha/bin/mocha -t 300000 tests",
     "testrpc": "node ./ipcConverter.js"
   },
   "author": "chronobank",
@@ -33,9 +29,10 @@
     "chai": "^4.1.1",
     "eslint": "^4.6.1",
     "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank",
+    "fs-extra": "^7.0.0",
     "ganache-cli": "^6.1.0",
+    "memwatch-next": "^0.3.0",
     "mocha": "^3.5.0",
-    "webstomp-client": "^1.0.6",
-    "ws": "^3.3.3"
+    "truffle-contract": "^3.0.6"
   }
 }

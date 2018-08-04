@@ -19,7 +19,7 @@ const mongoose = require('mongoose'),
   SyncCacheService = require('./services/syncCacheService'),
   bunyan = require('bunyan'),
   amqp = require('amqplib'),
-  log = bunyan.createLogger({name: 'app'}),
+  log = bunyan.createLogger({name: 'core.blockProcessor', level: config.logs.level}),
   filterTxsByAccountService = require('./services/filterTxsByAccountService');
 
 mongoose.Promise = Promise;
@@ -74,28 +74,18 @@ const init = async () => {
     await channel.publish('events', `${config.rabbit.serviceName}_block`, new Buffer(JSON.stringify({block: block.number})));
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
-    for (let tx of filteredTxs) {
-      let addresses = _.chain([tx.to, tx.from])
-        .union(tx.logs.map(log => log.address))
-        .uniq()
-        .value();
-
-      for (let address of addresses)
-        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(tx)));
-    }
+    for (let item of filteredTxs)
+      for (let tx of item.txs)
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${item.address}`, new Buffer(JSON.stringify(tx)));
   };
   let txEventCallback = async tx => {
-    const data = await filterTxsByAccountService([tx]);
-    for (let filteredTx of data) {
-      let addresses = _.chain([filteredTx.to, filteredTx.from])
-        .uniq()
-        .value();
-
-      filteredTx = _.omit(filteredTx, ['blockHash', 'transactionIndex']);
-      filteredTx.blockNumber = -1;
-      for (let address of addresses)
-        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${address}`, new Buffer(JSON.stringify(filteredTx)));
-    }
+    const filteredTxs = await filterTxsByAccountService([tx]);
+    for (let item of filteredTxs)
+      for (let tx of item.txs) {
+        tx = _.omit(tx, ['blockHash', 'transactionIndex']);
+        tx.blockNumber = -1;
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${item.address}`, new Buffer(JSON.stringify(tx)));
+      }
   };
 
   syncCacheService.events.on('block', blockEventCallback);

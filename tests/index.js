@@ -5,126 +5,75 @@
  */
 
 require('dotenv/config');
+process.env.LOG_LEVEL = 'error';
 
 const config = require('../config'),
+  models = require('../models'),
+  spawn = require('child_process').spawn,
+  Web3 = require('web3'),
+  net = require('net'),
+  fuzzTests = require('./fuzz'),
+  performanceTests = require('./performance'),
+  featuresTests = require('./features'),
+  blockTests = require('./blocks'),
+  fs = require('fs-extra'),
   Promise = require('bluebird'),
   mongoose = require('mongoose'),
-  models = require('../models'),
-  providerService = require('../services/providerService'),
-  awaitLastBlock = require('./helpers/awaitLastBlock'),
-  clearMongoBlocks = require('./helpers/clearMongoBlocks'),
-  saveAccountForAddress = require('./helpers/saveAccountForAddress'),
-  connectToQueue = require('./helpers/connectToQueue'),
-  clearQueues = require('./helpers/clearQueues'),
-  consumeMessages = require('./helpers/consumeMessages'),
-  consumeStompMessages = require('./helpers/consumeStompMessages'),
-  WebSocket = require('ws'),
-  expect = require('chai').expect,
   amqp = require('amqplib'),
-  Stomp = require('webstomp-client');
+  ctx = {};
 
 mongoose.Promise = Promise;
-mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri);
 mongoose.connect(config.mongo.data.uri, {useMongoClient: true});
+mongoose.accounts = mongoose.createConnection(config.mongo.accounts.uri, {useMongoClient: true});
 
-let ctx = {};
 
-describe('core/block processor', function () {
+describe('core/blockProcessor', function () {
 
   before(async () => {
-
     models.init();
 
-    await clearMongoBlocks();
-    ctx.amqpInstance = await amqp.connect(config.rabbit.url);
-    ctx.web3 = await providerService.get();
+    await fs.remove('testrpc_db');
+    ctx.nodePid = spawn('node', ['--max_old_space_size=4096', 'ipcConverter.js'], {
+      env: process.env,
+      stdio: 'ignore'
+    });
+    await Promise.delay(5000);
+    ctx.nodePid.on('exit', function () {
+      process.exit(1);
+    });
 
+    const provider = /http:\/\//.test(config.web3.providers[0]) ?
+      new Web3.providers.HttpProvider(config.web3.providers[0]) :
+      new Web3.providers.IpcProvider(`${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${config.web3.providers[0]}`, net);
+
+    ctx.web3 = new Web3(provider);
     ctx.accounts = await Promise.promisify(ctx.web3.eth.getAccounts)();
-    await saveAccountForAddress(ctx.accounts[0]);
-    await clearQueues(ctx.amqpInstance);
-    return await awaitLastBlock(ctx.web3);
+
+
+    ctx.amqp = {};
+    ctx.amqp.instance = await amqp.connect(config.rabbit.url);
+    ctx.amqp.channel = await ctx.amqp.instance.createChannel();
+    await ctx.amqp.channel.assertExchange('events', 'topic', {durable: false});
+    await ctx.amqp.channel.assertExchange('internal', 'topic', {durable: false});
+    await ctx.amqp.channel.assertQueue(`${config.rabbit.serviceName}_current_provider.get`, {durable: false});
+    await ctx.amqp.channel.bindQueue(`${config.rabbit.serviceName}_current_provider.get`, 'internal', `${config.rabbit.serviceName}_current_provider.get`);
+
   });
 
   after(async () => {
-    await clearMongoBlocks();
-    ctx.web3.currentProvider.connection.end();
-    return mongoose.disconnect();
-  });
-
-  afterEach(async () => {
-      await clearQueues(ctx.amqpInstance);
-  });
-
-  it('send some eth from 0 account to account 1', async () => {
-    const hash = await Promise.promisify(ctx.web3.eth.sendTransaction)({
-      from: ctx.accounts[0],
-      to: ctx.accounts[1],
-      value: 100
-    });
-    expect(hash).to.be.string;
-    expect(hash).to.be.not.undefined;
-  });
-
-  it('send some eth from account0 to account1 and validate countMessages(2) and structure message', async () => {
-
-    const checkMessage = function (content) {
-      expect(content).to.contain.all.keys(
-        'hash',
-        'nonce',
-        'blockNumber',
-        'from',
-        'to',
-        'value',
-        'gas',
-        'gasPrice',
-        'input',
-        'logs'
-      );
-      expect(content.value).to.equal('100');
-      expect(content.from).to.equal(ctx.accounts[0]);
-      expect(content.to).to.equal(ctx.accounts[1]);
-      expect(content.nonce).to.be.a('number');
-    };
-
-    return await Promise.all([
-      (async() => {
-        await Promise.promisify(ctx.web3.eth.sendTransaction)({
-          from: ctx.accounts[0],
-          to: ctx.accounts[1],
-          value: 100
-        });
-      })(),
-      (async () => {
-        const channel = await ctx.amqpInstance.createChannel();
-        await connectToQueue(channel);
-        return await consumeMessages(2, channel, (message) => {
-          checkMessage(JSON.parse(message.content));
-        });
-      })(),
-      (async () => {
-        const ws = new WebSocket('ws://localhost:15674/ws');
-        const client = Stomp.over(ws, {heartbeat: false, debug: false});
-        return await consumeStompMessages(2, client, (message) => {
-          checkMessage(JSON.parse(message.body));
-        });
-      })()
-    ]);
+    mongoose.disconnect();
+    mongoose.accounts.close();
+    await ctx.amqp.instance.close();
+    ctx.nodePid.kill();
   });
 
 
-  it('send some  eth from nonregistered user to non registered user and has not notifications', async () => {
+  describe('block', () => blockTests(ctx));
 
+  describe('fuzz', () => fuzzTests(ctx));
 
-    await Promise.promisify(ctx.web3.eth.sendTransaction)({
-      from: ctx.accounts[1],
-      to: ctx.accounts[2],
-      value: 100
-    });
-    Promise.delay(1000, async() => {
-      const channel = await ctx.amqpInstance.createChannel();
-      const queue =await connectToQueue(channel); 
-      expect(queue.messageCount).to.equal(0);
-    });
-  });
+  describe('performance', () => performanceTests(ctx));
+
+  describe('features', () => featuresTests(ctx));
 
 });

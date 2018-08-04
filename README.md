@@ -107,7 +107,7 @@ The blocks collection stores only the most valuable information about the block.
     "__v" : 0,
     "number" : 2379390,
     "timestamp" : 1527760928,
-    "totalTxFee" : NumberLong(10704416000000000),
+    "totalTxFee" : '10704416000000000',
     "uncleAmount" : 0
 ```
 

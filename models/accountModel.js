@@ -8,8 +8,6 @@ const mongoose = require('mongoose'),
   config = require('../config'),
   messages = require('middleware-common-components/factories/messages/addressMessageFactory');
 
-require('mongoose-long')(mongoose);
-
 /** @model accountModel
  *  @description account model - represents an bitcoin account
  */
@@ -20,7 +18,7 @@ const Account = new mongoose.Schema({
     required: true,
     validate: [a=>  /^(0x)?[0-9a-fA-F]{40}$/.test(a), messages.wrongAddress]
   },
-  balance: {type: mongoose.Schema.Types.Long, default: 0},
+  balance: {type: String, default: '0'},
   isActive: {type: Boolean, required: true, default: true},
   created: {type: Date, required: true, default: Date.now},
   erc20token : {type: mongoose.Schema.Types.Mixed, default: {}}
