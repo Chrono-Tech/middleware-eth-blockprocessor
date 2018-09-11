@@ -17,7 +17,7 @@ const net = require('net'),
   fs = require('fs'),
   path = require('path'),
   _ = require('lodash'),
-  log = bunyan.createLogger({name: 'ipcConverter'}),
+  log = bunyan.createLogger({name: 'ipcConverter', level: config.logs.level}),
   dbPath = path.join(__dirname, 'testrpc_db'),
   TestRPC = require('ganache-cli');
 
