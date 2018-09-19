@@ -28,12 +28,12 @@ const config = {
     url: process.env.RABBIT_URI || 'amqp://localhost:5672',
     serviceName: process.env.RABBIT_SERVICE_NAME || 'app_eth'
   },
-  infrastructureRabbit: {
-    url: process.env.RABBIT_VERSION_URI || process.env.RABBIT_URI || 'amqp://localhost:5672',
-    exchange: process.env.RABBIT_VERSION_EXCHANGE || 'internal',
-    serviceName: process.env.RABBIT_VERSION_SERVICE_NAME || 'infrastucture' 
+  systemRabbit: {
+    url: process.env.SYSTEM_RABBIT_URI || process.env.RABBIT_URI || 'amqp://localhost:5672',
+    exchange: process.env.SYSTEM_RABBIT_EXCHANGE || 'internal',
+    serviceName: process.env.SYSTEM_RABBIT_SERVICE_NAME || 'system' 
   },
-  checkInfrastructure: process.env.CHECK_INFRASTUCTURE || true,
+  checkSystem: process.env.CHECK_SYSTEM || true,
   sync: {
     shadow: parseInt(process.env.SYNC_SHADOW) || true
   },
