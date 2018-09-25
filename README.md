@@ -216,6 +216,10 @@ The options are presented below:
 | SYNC_SHADOW   | sync blocks in background, or await, until the whole blockchain will be cached in db
 | PROVIDERS   | the paths to ipc / http interface, written with comma sign
 | WEB3_URI (deprecated)   | the path to ipc interface
+| SYSTEM_RABBIT_URI   | rabbitmq URI connection string for infrastructure
+| SYSTEM_RABBIT_SERVICE_NAME   | rabbitmq service name for infrastructure
+| SYSTEM_RABBIT_EXCHANGE   | rabbitmq exchange name for infrastructure
+| CHECK_SYSTEM | check infrastructure or not (default = true)
 
 License
 ----
