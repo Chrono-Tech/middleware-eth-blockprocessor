@@ -7,7 +7,6 @@
 const config = require('../../config'),
   models = require('../../models'),
   spawn = require('child_process').spawn,
-  memwatch = require('memwatch-next'),
   expect = require('chai').expect,
   Promise = require('bluebird'),
   SyncCacheService = require('../../services/syncCacheService'),
@@ -24,7 +23,6 @@ module.exports = (ctx) => {
   });
 
 
-
   it('validate sync cache service performance', async () => {
 
     const blockNumber = await Promise.promisify(ctx.web3.eth.getBlockNumber)();
@@ -35,15 +33,15 @@ module.exports = (ctx) => {
         await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
 
 
-    let hd = new memwatch.HeapDiff();
+    const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
     const syncCacheService = new SyncCacheService();
     await syncCacheService.start();
     await Promise.delay(10000);
+    global.gc();
+    await Promise.delay(5000);
 
-    let diff = hd.end();
-    let leakObjects = _.filter(diff.change.details, detail => detail.size_bytes / 1024 / 1024 > 3);
-
-    expect(leakObjects.length).to.be.eq(0);
+    const memUsage2 = process.memoryUsage().heapUsed / 1024 / 1024;
+    expect(memUsage2 - memUsage).to.be.below(3);
   });
 
 
@@ -54,16 +52,16 @@ module.exports = (ctx) => {
     for (let i = 0; i < 100; i++)
       await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
 
-    let hd = new memwatch.HeapDiff();
+    const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
     const blockWatchingService = new BlockWatchingService(blockNumber);
     await blockWatchingService.startSync();
     await Promise.delay(10000);
     await blockWatchingService.stopSync();
+    global.gc();
+    await Promise.delay(5000);
 
-    let diff = hd.end();
-    let leakObjects = _.filter(diff.change.details, detail => detail.size_bytes / 1024 / 1024 > 3);
-
-    expect(leakObjects.length).to.be.eq(0);
+    const memUsage2 = process.memoryUsage().heapUsed / 1024 / 1024;
+    expect(memUsage2 - memUsage).to.be.below(3);
   });
 
   it('validate tx notification speed', async () => {
@@ -78,7 +76,7 @@ module.exports = (ctx) => {
 
     await Promise.all([
       (async () => {
-        await ctx.amqp.channel.assertQueue(`app_${config.rabbit.serviceName}_test_performance.transaction`);
+        await ctx.amqp.channel.assertQueue(`app_${config.rabbit.serviceName}_test_performance.transaction`, {autoDelete: true});
         await ctx.amqp.channel.bindQueue(`app_${config.rabbit.serviceName}_test_performance.transaction`, 'events', `${config.rabbit.serviceName}_transaction.${ctx.accounts[0]}`);
         await new Promise(res =>
           ctx.amqp.channel.consume(`app_${config.rabbit.serviceName}_test_performance.transaction`, async data => {
@@ -100,7 +98,11 @@ module.exports = (ctx) => {
       })(),
       (async () => {
         await Promise.delay(10000);
-        let txHash = await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1000});
+        let txHash = await Promise.promisify(ctx.web3.eth.sendTransaction)({
+          from: ctx.accounts[0],
+          to: ctx.accounts[1],
+          value: 1000
+        });
         tx = await Promise.promisify(ctx.web3.eth.getTransaction)(txHash);
         start = Date.now();
       })()
@@ -117,33 +119,24 @@ module.exports = (ctx) => {
     const blockWatchingService = new BlockWatchingService(blockNumber);
 
     let txHashes = await Promise.mapSeries(new Array(100), async () => {
-      return await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1000});
-    });
-
-    let hd = new memwatch.HeapDiff();
-
-    for (let txHash of txHashes)
-      blockWatchingService.unconfirmedTxEvent(txHash).catch(e => {
-        throw new Error(e)
+      return await Promise.promisify(ctx.web3.eth.sendTransaction)({
+        from: ctx.accounts[0],
+        to: ctx.accounts[1],
+        value: 1000
       });
-
-    await new Promise(res => {
-      let pinInterval = setInterval(async () => {
-        let newTxCount = await models.txModel.count();
-
-        if (newTxCount !== txCount + txHashes.length)
-          return;
-
-        clearInterval(pinInterval);
-        res();
-      }, 3000);
     });
 
-    let diff = hd.end();
-    let leakObjects = _.filter(diff.change.details, detail => detail.size_bytes / 1024 / 1024 > 3);
+    await Promise.delay(5000);
+    const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
+    await Promise.mapSeries(txHashes, async txHash=> await blockWatchingService.unconfirmedTxEvent(txHash));
+    global.gc();
+    await Promise.delay(5000);
 
-    expect(leakObjects.length).to.be.eq(0);
 
+    let newTxCount = await models.txModel.count();
+    expect(newTxCount).to.eq(txCount + txHashes.length);
+    const memUsage2 = process.memoryUsage().heapUsed / 1024 / 1024;
+    expect(memUsage2 - memUsage).to.be.below(3);
   });
 
 };
