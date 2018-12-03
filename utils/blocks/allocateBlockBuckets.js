@@ -60,7 +60,7 @@ module.exports = async function () {
 
   let web3 = await providerService.get();
 
-  let currentNodeHeight = await Promise.promisify(web3.eth.getBlockNumber)().timeout(10000).catch(() => -1);
+  let currentNodeHeight = await web3.eth.getBlockNumber().catch(() => -1);
   currentNodeHeight = parseInt(currentNodeHeight);
 
   if (currentNodeHeight === -1)

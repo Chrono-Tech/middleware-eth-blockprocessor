@@ -12,7 +12,7 @@ module.exports = async () => {
 
   let web3 = await providerService.get();
 
-  const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
+  const pendingBlock = await web3.eth.getBlock('pending');
 
   if (!_.get(pendingBlock, 'transactions', []).length)
     return;

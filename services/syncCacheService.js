@@ -93,10 +93,10 @@ class SyncCacheService {
    */
   async runPeer(bucket) {
 
+    console.log('getting web3 instance')
     let web3 = await providerService.get();
 
-    const lastBlock = await Promise.promisify(web3.eth.getBlock)(_.last(bucket), false).timeout(60000);
-
+    const lastBlock = await web3.eth.getBlock(_.last(bucket), false);
 
     if (!lastBlock || (_.last(bucket) !== 0 && !lastBlock.number))
       return await Promise.delay(10000);
@@ -104,10 +104,15 @@ class SyncCacheService {
     log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
 
     await Promise.mapSeries(bucket, async (blockNumber) => {
+      console.log('getting block')
       const block = await getBlock(blockNumber);
+      console.log('adding block')
       await addBlock(block);
 
+      console.log('remove block from bucket')
       _.pull(bucket, blockNumber);
+
+      console.log('emitting event...')
       this.events.emit('block', block);
     });
 

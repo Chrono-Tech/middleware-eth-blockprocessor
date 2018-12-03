@@ -4,8 +4,7 @@
  * @author Egor Zuev <zyev.egor@gmail.com>
  */
 
-const Promise = require('bluebird'),
-  providerService = require('../../services/providerService'),
+const providerService = require('../../services/providerService'),
   _ = require('lodash');
 
 /**
@@ -23,9 +22,9 @@ module.exports = async (blockNumber) => {
 
   let web3 = await providerService.get();
 
-  let rawBlock = await Promise.promisify(web3.eth.getBlock)(blockNumber, true).timeout(10000);
+  let rawBlock = await web3.eth.getBlock(blockNumber, true);
 
-  if(!rawBlock)
+  if (!rawBlock)
     return Promise.reject({code: 2});
 
   rawBlock.uncleAmount = rawBlock.uncles.length;
@@ -35,10 +34,7 @@ module.exports = async (blockNumber) => {
     return rawBlock;
   }
 
-  let logs = await new Promise((res, rej) =>
-    web3.eth.filter({fromBlock: blockNumber, toBlock: blockNumber})
-      .get((err, result) => err ? rej(err) : res(result))
-  ).timeout(30000);
+  let logs = await web3.eth.getPastLogs({fromBlock: blockNumber, toBlock: blockNumber});
 
   rawBlock.transactions = rawBlock.transactions.map(tx => {
     tx.logs = _.chain(logs)

@@ -132,8 +132,16 @@ const init = async () => {
   blockWatchingService.events.on('block', blockEventCallback);
   blockWatchingService.events.on('tx', txEventCallback);
 
-  await blockWatchingService.startSync();
+  //await blockWatchingService.startSync();
 };
+
+
+/*
+process.on('unhandledRejection', (reason, promise) => {//todo remove
+  console.log('Unhandled Rejection at:', reason.stack || reason)
+  process.exit(0)
+})
+*/
 
 module.exports = init().catch(err => {
   log.error(err);
