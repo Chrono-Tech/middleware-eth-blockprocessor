@@ -23,24 +23,24 @@ const bunyan = require('bunyan'),
  * @returns {Promise.<*>}
  */
 
-class SyncCacheService {
+class SyncCacheService extends EventEmitter {
 
-  constructor() {
-    this.events = new EventEmitter();
+  constructor () {
+    super();
   }
 
   /** @function
    * @description start syncing process
    * @return {Promise<*>}
    */
-  async start() {
+  async start () {
     await this.indexCollection();
     let data = await allocateBlockBuckets();
     this.doJob(data.missedBuckets);
     return data.height;
   }
 
-  async indexCollection() {
+  async indexCollection () {
     log.info('indexing...');
     await models.blockModel.init();
     await models.txModel.init();
@@ -54,7 +54,7 @@ class SyncCacheService {
    * @param buckets - array of blocks
    * @return {Promise<void>}
    */
-  async doJob(buckets) {
+  async doJob (buckets) {
 
     while (buckets.length)
       try {
@@ -75,13 +75,13 @@ class SyncCacheService {
             _.pull(buckets, bucket);
         }
 
-        this.events.emit('end');
+        this.emit('end');
 
       } catch (err) {
         log.error(err);
       }
 
-    this.events.emit('end');
+    this.emit('end');
 
   }
 
@@ -91,9 +91,8 @@ class SyncCacheService {
    * @param bucket
    * @return {Promise<*>}
    */
-  async runPeer(bucket) {
+  async runPeer (bucket) {
 
-    console.log('getting web3 instance')
     let web3 = await providerService.get();
 
     const lastBlock = await web3.eth.getBlock(_.last(bucket), false);
@@ -104,16 +103,10 @@ class SyncCacheService {
     log.info(`web3 provider took chuck of blocks ${bucket[0]} - ${_.last(bucket)}`);
 
     await Promise.mapSeries(bucket, async (blockNumber) => {
-      console.log('getting block')
       const block = await getBlock(blockNumber);
-      console.log('adding block')
       await addBlock(block);
-
-      console.log('remove block from bucket')
       _.pull(bucket, blockNumber);
-
-      console.log('emitting event...')
-      this.events.emit('block', block);
+      this.emit('block', block);
     });
 
   }

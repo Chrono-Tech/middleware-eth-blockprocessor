@@ -11,11 +11,12 @@
 const mongoose = require('mongoose'),
   config = require('./config'),
   models = require('./models'),
+  RMQBlockModel = require('middleware-common-components/models/rmq/eth/blockModel'),
+  RMQTxModel = require('middleware-common-components/models/rmq/eth/txModel'),
   MasterNodeService = require('middleware-common-components/services/blockProcessor/MasterNodeService'),
   Promise = require('bluebird'),
   _ = require('lodash'),
   providerService = require('./services/providerService'),
-
   AmqpService = require('middleware_common_infrastructure/AmqpService'),
   InfrastructureInfo = require('middleware_common_infrastructure/InfrastructureInfo'),
   InfrastructureService = require('middleware_common_infrastructure/InfrastructureService'),
@@ -79,7 +80,7 @@ const init = async () => {
   const masterNodeService = new MasterNodeService(channel, config.rabbit.serviceName);
   await masterNodeService.start();
 
-  providerService.events.on('provider_set', providerURI => {
+  providerService.on('provider_set', providerURI => {
     let providerIndex = _.findIndex(config.web3.providers, providerURI);
     if (providerIndex !== -1)
       channel.publish('internal', `${config.rabbit.serviceName}_current_provider.set`, new Buffer(JSON.stringify({index: providerIndex})));
@@ -96,24 +97,30 @@ const init = async () => {
 
   let blockEventCallback = async block => {
     log.info(`${block.hash} (${block.number}) added to cache.`);
-    await channel.publish('events', `${config.rabbit.serviceName}_block`, new Buffer(JSON.stringify({block: block.number})));
+
+    const blockModel = new RMQBlockModel({block: block.number});
+
+    await channel.publish('events', `${config.rabbit.serviceName}_block`, new Buffer(blockModel.toString()));
     const filteredTxs = await filterTxsByAccountService(block.transactions);
 
     for (let item of filteredTxs)
-      for (let tx of item.txs)
-        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${item.address}`, new Buffer(JSON.stringify(tx)));
+      for (let tx of item.txs) {
+
+        const txModel = new RMQTxModel(tx);
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${item.address}`, new Buffer(txModel.toString()));
+      }
   };
   let txEventCallback = async tx => {
     const filteredTxs = await filterTxsByAccountService([tx]);
     for (let item of filteredTxs)
       for (let tx of item.txs) {
-        tx = _.omit(tx, ['blockHash', 'transactionIndex']);
         tx.blockNumber = -1;
-        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${item.address}`, new Buffer(JSON.stringify(tx)));
+        const txModel = new RMQTxModel(tx);
+        await channel.publish('events', `${config.rabbit.serviceName}_transaction.${item.address}`, new Buffer(txModel.toString()));
       }
   };
 
-  syncCacheService.events.on('block', blockEventCallback);
+  syncCacheService.on('block', blockEventCallback);
 
   let endBlock = await syncCacheService.start();
 
@@ -121,7 +128,7 @@ const init = async () => {
     if (config.sync.shadow)
       return res();
 
-    syncCacheService.events.on('end', () => {
+    syncCacheService.on('end', () => {
       log.info(`cached the whole blockchain up to block: ${endBlock}`);
       res();
     });
@@ -129,19 +136,17 @@ const init = async () => {
 
   let blockWatchingService = new BlockWatchingService(endBlock);
 
-  blockWatchingService.events.on('block', blockEventCallback);
-  blockWatchingService.events.on('tx', txEventCallback);
+  blockWatchingService.on('block', blockEventCallback);
+  blockWatchingService.on('tx', txEventCallback);
 
-  //await blockWatchingService.startSync();
+  await blockWatchingService.startSync();
 };
 
 
-/*
-process.on('unhandledRejection', (reason, promise) => {//todo remove
-  console.log('Unhandled Rejection at:', reason.stack || reason)
-  process.exit(0)
-})
-*/
+providerService.on('connection_error', err => {
+  log.error(err);
+  process.exit(1);
+});
 
 module.exports = init().catch(err => {
   log.error(err);

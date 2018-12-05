@@ -33,7 +33,6 @@
     "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank",
     "fs-extra": "^7.0.0",
     "ganache-cli": "^6.1.0",
-    "mocha": "^3.5.0",
-    "truffle-contract": "^3.0.6"
+    "mocha": "^3.5.0"
   }
 }

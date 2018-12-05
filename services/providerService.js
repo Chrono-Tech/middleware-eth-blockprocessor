@@ -12,8 +12,7 @@ const bunyan = require('bunyan'),
   net = require('net'),
   providerServiceInterface = require('middleware-common-components/interfaces/blockProcessor/providerServiceInterface'),
   Promise = require('bluebird'),
-  EventEmitter = require('events'),
-  log = bunyan.createLogger({name: 'core.blockProcessor.services.syncCacheService', level: config.logs.level});
+  EventEmitter = require('events');
 
 /**
  * @service
@@ -21,10 +20,10 @@ const bunyan = require('bunyan'),
  * @returns Object<ProviderService>
  */
 
-class providerService {
+class providerService extends EventEmitter {
 
   constructor () {
-    this.events = new EventEmitter();
+    super();
     this.connector = null;
     this.filter = null;
 
@@ -74,19 +73,16 @@ class providerService {
    */
   async switchConnector () {
 
-    console.log('switching connector')
     const providerURI = await Promise.any(config.web3.providers.map(async providerURI => {
       const web3 = this.makeWeb3FromProviderURI(providerURI);
       await web3.eth.getBlockNumber();
       if (_.has(web3, 'currentProvider.connection.close'))
         web3.currentProvider.connection.close();
       return providerURI;
-    })).catch(() => {
-      log.error('no available connection!');
-      process.exit(0); //todo move to root
+    })).catch((err) => {
+      this.emit('connection_error', `no available connection: ${err.toString()}`);
     });
 
-    console.log('switched connector')
 
     const fullProviderURI = !/^http/.test(providerURI) ? `${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${providerURI}` : providerURI;
     const currentProviderURI = this.connector ? this.connector.currentProvider.path || this.connector.currentProvider.host : '';
@@ -98,10 +94,13 @@ class providerService {
 
     if (_.get(this.connector.currentProvider, 'connection')) {
 
-/*      this.connector.currentProvider.connection.on('end', () => this.resetConnector());
-      this.connector.currentProvider.connection.on('error', () => this.resetConnector());*/
-      this.connector.currentProvider.connection.onerror(()=>this.resetConnector());
-      this.connector.currentProvider.connection.onclose(()=>this.resetConnector());
+      if (_.has(this.connector.currentProvider.connection, 'onerror')) {
+        this.connector.currentProvider.connection.onerror(() => this.resetConnector());
+        this.connector.currentProvider.connection.onclose(() => this.resetConnector());
+      } else if (_.has(this.connector.currentProvider.connection, 'on')) {
+        this.connector.currentProvider.connection.on('end', () => this.resetConnector());
+        this.connector.currentProvider.connection.on('error', () => this.resetConnector());
+      }
 
 
     } else
@@ -118,10 +117,10 @@ class providerService {
 
     this.filter = this.connector.eth.subscribe('pendingTransactions');
     this.filter.on('data', (transaction) => {
-      this.events.emit('unconfirmedTx', transaction);
+      this.emit('unconfirmedTx', transaction);
     });
 
-    this.events.emit('provider_set');
+    this.emit('provider_set');
     return this.connector;
 
   }
@@ -132,9 +131,6 @@ class providerService {
    * @return {Promise<bluebird>}
    */
   async switchConnectorSafe () {
-
-    console.log('going to switch connector')
-
     return new Promise(res => {
       sem.take(async () => {
         await this.switchConnector();
@@ -150,11 +146,6 @@ class providerService {
    * @return {Promise<*|bluebird>}
    */
   async get () {
-
-    if(this.connector){
-      console.log('is listening: ', await this.connector.eth.getProtocolVersion().catch(()=>null))
-    }
-
     return this.connector && await this.connector.eth.getProtocolVersion().catch(() => false) ? this.connector : await this.switchConnectorSafe();
   }
 

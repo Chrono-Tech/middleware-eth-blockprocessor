@@ -1,5 +1,4 @@
 const providerService = require('../../services/providerService'),
-  Promise = require('bluebird'),
   _ = require('lodash'),
   models = require('../../models');
 
