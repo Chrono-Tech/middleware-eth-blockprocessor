@@ -23,6 +23,7 @@ const TX = new mongoose.Schema({
   nonce: {type: Number},
   gasPrice: {type: String},
   gas: {type: String},
+  gasUsed: {type: String},
   from: {type: String, index: true}
 }, {_id: false});
 

@@ -42,12 +42,15 @@ describe('core/blockProcessor', function () {
       process.exit(1);
     });
 
-    const provider = /http:\/\//.test(config.web3.providers[0]) ?
-      new Web3.providers.HttpProvider(config.web3.providers[0]) :
-      new Web3.providers.IpcProvider(`${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${config.web3.providers[0]}`, net);
 
-    ctx.web3 = new Web3(provider);
-    ctx.accounts = await Promise.promisify(ctx.web3.eth.getAccounts)();
+    ctx.web3 = (/^http/.test(config.web3.providers[0]) || /^ws/.test(config.web3.providers[0])) ?
+      new Web3(config.web3.providers[0]) :
+      new Web3(`${/^win/.test(process.platform) ? '\\\\.\\pipe\\' : ''}${config.web3.providers[0]}`, net);
+
+
+    ctx.accounts = await ctx.web3.eth.getAccounts();
+
+    ctx.accounts = ctx.accounts.map(account=>account.toLowerCase());
 
 
     ctx.amqp = {};
