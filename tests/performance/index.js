@@ -10,8 +10,7 @@ const config = require('../../config'),
   expect = require('chai').expect,
   Promise = require('bluebird'),
   SyncCacheService = require('../../services/syncCacheService'),
-  BlockWatchingService = require('../../services/blockWatchingService'),
-  _ = require('lodash');
+  BlockWatchingService = require('../../services/blockWatchingService');
 
 module.exports = (ctx) => {
 
@@ -25,12 +24,12 @@ module.exports = (ctx) => {
 
   it('validate sync cache service performance', async () => {
 
-    const blockNumber = await Promise.promisify(ctx.web3.eth.getBlockNumber)();
+    const blockNumber = await ctx.web3.eth.getBlockNumber();
     const addBlocksCount = 100 - blockNumber;
 
     if (addBlocksCount > 0)
       for (let i = 0; i < addBlocksCount; i++)
-        await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
+        await ctx.web3.eth.sendTransaction({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
 
 
     const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -47,10 +46,10 @@ module.exports = (ctx) => {
 
   it('validate block watching service performance', async () => {
 
-    const blockNumber = await Promise.promisify(ctx.web3.eth.getBlockNumber)();
+    const blockNumber = await ctx.web3.eth.getBlockNumber();
 
     for (let i = 0; i < 100; i++)
-      await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
+      await ctx.web3.eth.sendTransaction({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
 
     const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
     const blockWatchingService = new BlockWatchingService(blockNumber);
@@ -66,7 +65,7 @@ module.exports = (ctx) => {
 
   it('validate tx notification speed', async () => {
 
-    ctx.blockProcessorPid = spawn('node', ['index.js'], {env: process.env, stdio: 'inherit'});
+    ctx.blockProcessorPid = spawn('node', ['index.js'], {env: process.env, stdio: 'ignore'});
     await Promise.delay(10000);
     await new models.accountModel({address: ctx.accounts[0]}).save();
 
@@ -86,7 +85,7 @@ module.exports = (ctx) => {
 
             const message = JSON.parse(data.content.toString());
 
-            if (message.hash !== tx.hash)
+            if (message.hash !== tx.transactionHash)
               return;
 
             end = Date.now();
@@ -98,28 +97,28 @@ module.exports = (ctx) => {
       })(),
       (async () => {
         await Promise.delay(10000);
-        let txHash = await Promise.promisify(ctx.web3.eth.sendTransaction)({
+        tx = await ctx.web3.eth.sendTransaction({
           from: ctx.accounts[0],
           to: ctx.accounts[1],
           value: 1000
         });
-        tx = await Promise.promisify(ctx.web3.eth.getTransaction)(txHash);
+
         start = Date.now();
       })()
     ]);
 
-    expect(end - start).to.be.below(5000);
+    expect(end - start).to.be.below(10000);
     ctx.blockProcessorPid.kill();
   });
 
   it('unconfirmed txs performance', async () => {
 
     let txCount = await models.txModel.count();
-    const blockNumber = await Promise.promisify(ctx.web3.eth.getBlockNumber)();
+    const blockNumber = await ctx.web3.eth.getBlockNumber();
     const blockWatchingService = new BlockWatchingService(blockNumber);
 
-    let txHashes = await Promise.mapSeries(new Array(100), async () => {
-      return await Promise.promisify(ctx.web3.eth.sendTransaction)({
+    let txs = await Promise.mapSeries(new Array(100), async () => {
+      return await ctx.web3.eth.sendTransaction({
         from: ctx.accounts[0],
         to: ctx.accounts[1],
         value: 1000
@@ -128,13 +127,13 @@ module.exports = (ctx) => {
 
     await Promise.delay(5000);
     const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
-    await Promise.mapSeries(txHashes, async txHash=> await blockWatchingService.unconfirmedTxEvent(txHash));
+    await Promise.mapSeries(txs, async tx=> await blockWatchingService.unconfirmedTxEvent(tx));
     global.gc();
     await Promise.delay(5000);
 
 
     let newTxCount = await models.txModel.count();
-    expect(newTxCount).to.eq(txCount + txHashes.length);
+    expect(newTxCount).to.eq(txCount + txs.length);
     const memUsage2 = process.memoryUsage().heapUsed / 1024 / 1024;
     expect(memUsage2 - memUsage).to.be.below(3);
   });

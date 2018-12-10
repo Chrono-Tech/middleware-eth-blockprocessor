@@ -46,11 +46,11 @@ module.exports = async (txs) => {
     .flattenDeep()
     .uniq()
     .map(address => ({
-        address: address,
-        txs: _.filter(txs, tx =>
-            _.union(tx.logs.map(log => log.address), [tx.to, tx.from]).includes(address)
-          )
-      })
+      address: address,
+      txs: _.filter(txs, tx =>
+        _.union(tx.logs.map(log => log.address), [tx.to, tx.from]).includes(address)
+      )
+    })
     )
     .value();
 };

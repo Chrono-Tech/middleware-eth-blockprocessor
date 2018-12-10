@@ -26,10 +26,10 @@ const config = require('../config'),
  * @returns Object<BlockWatchingService>
  */
 
-class BlockWatchingService {
+class BlockWatchingService extends EventEmitter {
 
   constructor (currentHeight) {
-    this.events = new EventEmitter();
+    super();
     this.currentHeight = currentHeight;
     this.isSyncing = false;
   }
@@ -45,7 +45,7 @@ class BlockWatchingService {
     this.isSyncing = true;
     let web3 = await providerService.get();
 
-    const pendingBlock = await Promise.promisify(web3.eth.getBlock)('pending').timeout(5000);
+    const pendingBlock = await web3.eth.getBlock('pending');
 
     if (!pendingBlock)
       await removeUnconfirmedTxs();
@@ -54,7 +54,7 @@ class BlockWatchingService {
     this.doJob();
 
     this.unconfirmedTxEventCallback = result=> this.unconfirmedTxEvent(result).catch();
-    providerService.events.on('unconfirmedTx', this.unconfirmedTxEventCallback);
+    providerService.on('unconfirmedTx', this.unconfirmedTxEventCallback);
 
   }
 
@@ -69,7 +69,7 @@ class BlockWatchingService {
         const block = await this.processBlock();
         await addBlock(block, true);
         this.currentHeight++;
-        this.events.emit('block', block);
+        this.emit('block', block);
       } catch (err) {
 
         if (_.get(err, 'code') === 0) {
@@ -100,21 +100,30 @@ class BlockWatchingService {
   /**
    * @function
    * @description process unconfirmed tx
-   * @param hash - the hash of transaction
+   * @param transactionReceipt - the receipt of transaction
    * @return {Promise<void>}
    */
-  async unconfirmedTxEvent (hash) {
+  async unconfirmedTxEvent (transactionReceipt) {
 
     let web3 = await providerService.get();
-    let tx = await Promise.promisify(web3.eth.getTransaction)(hash);
+    let tx = await web3.eth.getTransaction(transactionReceipt.transactionHash);
 
     if (!_.has(tx, 'hash'))
       return;
 
+
+    if (tx.from)
+      tx.from = tx.from.toLowerCase();
+
+    if (tx.to)
+      tx.to = tx.to.toLowerCase();
+
+    tx.gasUsed = transactionReceipt.gasUsed;
+
     tx.logs = [];
 
     await addUnconfirmedTx(tx);
-    this.events.emit('tx', tx);
+    this.emit('tx', tx);
 
   }
 
@@ -125,7 +134,7 @@ class BlockWatchingService {
    */
   async stopSync () {
     this.isSyncing = false;
-    providerService.events.removeListener('unconfirmedTx', this.unconfirmedTxEventCallback);
+    providerService.removeListener('unconfirmedTx', this.unconfirmedTxEventCallback);
 
   }
 
@@ -137,13 +146,13 @@ class BlockWatchingService {
   async processBlock () {
 
     let web3 = await providerService.get();
-    const block = await Promise.promisify(web3.eth.getBlockNumber)().timeout(2000).catch(() => 0);
+    const block = await web3.eth.getBlockNumber().catch(() => 0);
 
     if (block === this.currentHeight - 1)
       return Promise.reject({code: 0});
 
     const lastBlock = this.currentHeight === 0 ? null :
-      await Promise.promisify(web3.eth.getBlock)(this.currentHeight - 1, false).timeout(60000).catch(() => null);
+      await web3.eth.getBlock(this.currentHeight - 1, false);
 
 
     if (_.get(lastBlock, 'hash')) {
