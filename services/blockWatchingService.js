@@ -53,7 +53,7 @@ class BlockWatchingService extends EventEmitter {
     log.info(`caching from block:${this.currentHeight} for network:${config.web3.network}`);
     this.doJob();
 
-    this.unconfirmedTxEventCallback = result=> this.unconfirmedTxEvent(result).catch();
+    this.unconfirmedTxEventCallback = result => this.unconfirmedTxEvent(result).catch();
     providerService.on('unconfirmedTx', this.unconfirmedTxEventCallback);
 
   }
@@ -92,7 +92,6 @@ class BlockWatchingService extends EventEmitter {
         }
 
         log.error(err);
-
       }
 
   }
@@ -154,12 +153,14 @@ class BlockWatchingService extends EventEmitter {
     const lastBlock = this.currentHeight === 0 ? null :
       await web3.eth.getBlock(this.currentHeight - 1, false);
 
-
     if (_.get(lastBlock, 'hash')) {
       let savedBlock = await models.blockModel.count({_id: lastBlock.hash});
 
-      if (!savedBlock)
-        return Promise.reject({code: 1});
+      if (!savedBlock) {
+        let isNotEmpty = await models.blockModel.count();
+        if (isNotEmpty)
+          return Promise.reject({code: 1});
+      }
     }
 
     return await getBlock(this.currentHeight);
