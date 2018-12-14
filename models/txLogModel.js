@@ -24,14 +24,17 @@ const mongoose = require('mongoose'),
  * @return {*}
  */
 const setArgs = function (topics) {
-  _.pullAt(topics, 0);
-  return topics.map((topic, index) => {
+
+  let clonedTopics = _.cloneDeep(topics);
+
+  _.pullAt(clonedTopics, 0);
+  return clonedTopics.map((topic, index) => {
     let bn = BigNumber(topic, 16);
     return {
       e: bn.e,
       c: bn.c,
       index: index
-    }
+    };
   });
 };
 

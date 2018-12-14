@@ -9,7 +9,8 @@ require('dotenv/config');
 const models = require('../../models'),
   config = require('../../config'),
   _ = require('lodash'),
-  expect = require('chai').expect,
+  RMQBlockModel = require('middleware-common-components/models/rmq/eth/blockModel'),
+  RMQTxModel = require('middleware-common-components/models/rmq/eth/txModel'),
   Promise = require('bluebird'),
   spawn = require('child_process').spawn;
 
@@ -40,7 +41,7 @@ module.exports = (ctx) => {
               return;
 
             const message = JSON.parse(data.content.toString());
-            expect(message).to.have.all.keys('block');
+            new RMQBlockModel(message);
 
             _.pull(generatedBlockNumbers, message.block);
 
@@ -54,12 +55,13 @@ module.exports = (ctx) => {
       })(),
       (async () => {
         for (let number = 1; number <= 100; number++) {
-          generatedBlockNumbers.push(number);
-          await Promise.promisify(ctx.web3.eth.sendTransaction)({
+          let tx = await ctx.web3.eth.sendTransaction({
             from: ctx.accounts[0],
             to: ctx.accounts[1],
             value: 1000
           });
+
+          generatedBlockNumbers.push(tx.blockNumber);
         }
       })()
     ]);
@@ -83,8 +85,9 @@ module.exports = (ctx) => {
 
             const message = JSON.parse(data.content.toString());
 
-            expect(message).to.have.keys('hash', 'blockNumber', 'blockHash', 'transactionIndex', 'from', 'to', 'gas', 'gasPrice', 'input', 'logs', 'nonce', 'value');
-            if (tx && message.hash !== tx.hash)
+            new RMQTxModel(message);
+
+            if (tx && message.hash !== tx.transactionHash)
               return;
 
             await ctx.amqp.channel.deleteQueue(`app_${config.rabbit.serviceName}_test_features.transaction`);
@@ -94,12 +97,11 @@ module.exports = (ctx) => {
       })(),
       (async () => {
         await Promise.delay(10000);
-        let txHash = await Promise.promisify(ctx.web3.eth.sendTransaction)({
+        tx = await ctx.web3.eth.sendTransaction({
           from: ctx.accounts[0],
           to: ctx.accounts[1],
           value: 1000
         });
-        tx = await Promise.promisify(ctx.web3.eth.getTransaction)(txHash);
       })()
     ]);
   });
@@ -123,7 +125,7 @@ module.exports = (ctx) => {
             if (!tx)
               return;
 
-            let txExist = await models.txModel.count({_id: tx.hash});
+            let txExist = await models.txModel.count({_id: tx.transactionHash});
 
             if (!txExist)
               return;
@@ -135,12 +137,11 @@ module.exports = (ctx) => {
         });
       })(),
       (async () => {
-        let txHash = await Promise.promisify(ctx.web3.eth.sendTransaction)({
+        tx = await ctx.web3.eth.sendTransaction({
           from: ctx.accounts[0],
           to: ctx.accounts[1],
           value: 1000
         });
-        tx = await Promise.promisify(ctx.web3.eth.getTransaction)(txHash);
       })()
     ]);
   });
