@@ -102,27 +102,32 @@ class BlockWatchingService extends EventEmitter {
    * @param transactionReceipt - the receipt of transaction
    * @return {Promise<void>}
    */
-  async unconfirmedTxEvent (transactionReceipt) {
+  async unconfirmedTxEvent (transactionHash) {
 
     let web3 = await providerService.get();
-    let tx = await web3.eth.getTransaction(transactionReceipt.transactionHash);
+    let transaction = await web3.eth.getTransaction(transactionHash);
 
-    if (!_.has(tx, 'hash'))
+    if (!_.has(transaction, 'hash'))
       return;
 
 
-    if (tx.from)
-      tx.from = tx.from.toLowerCase();
+    let transformedTransaction = {
+      hash: transaction.hash,
+      blockNumber: -1,
+      blockHash: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      transactionIndex: _.get(transaction, 'transactionIndex', 0),
+      from: transaction.from ? transaction.from.toLowerCase() : null,
+      to: transaction.to ? transaction.to.toLowerCase() : null,
+      gas: _.get(transaction, 'gas', 0).toString(),
+      gasPrice: _.get(transaction, 'gasPrice', 0).toString(),
+      gasUsed: '0',
+      logs: _.get(transaction, 'logs', []),
+      nonce: transaction.nonce,
+      value: transaction.value
+    };
 
-    if (tx.to)
-      tx.to = tx.to.toLowerCase();
-
-    tx.gasUsed = transactionReceipt.gasUsed;
-
-    tx.logs = [];
-
-    await addUnconfirmedTx(tx);
-    this.emit('tx', tx);
+    await addUnconfirmedTx(transformedTransaction);
+    this.emit('tx', transformedTransaction);
 
   }
 

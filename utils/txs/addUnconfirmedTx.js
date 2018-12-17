@@ -6,6 +6,7 @@
 
 const bunyan = require('bunyan'),
   models = require('../../models'),
+  _ = require('lodash'),
   config = require('../../config'),
   sem = require('semaphore')(1),
   log = bunyan.createLogger({name: 'core.blockProcessor.utils.addUnconfirmedTx', level: config.logs.level});
@@ -19,18 +20,7 @@ const bunyan = require('bunyan'),
 
 const addTx = async (tx) => {
 
-  tx = {
-    _id: tx.hash,
-    blockNumber: -1,
-    index: tx.transactionIndex,
-    value: tx.value.toString(),
-    to: tx.to,
-    nonce: tx.nonce,
-    input: tx.input,
-    gasPrice: tx.gasPrice.toString(),
-    gas: tx.gas,
-    from: tx.from
-  };
+  tx._id = tx.hash;
 
   log.info(`inserting unconfirmed tx ${tx._id}`);
   await models.txModel.create(tx);
@@ -43,7 +33,7 @@ module.exports = async (tx) => {
   return await new Promise((res, rej) => {
     sem.take(async () => {
       try {
-        await addTx(tx);
+        await addTx(_.cloneDeep(tx));
         res();
       } catch (err) {
         rej(err);

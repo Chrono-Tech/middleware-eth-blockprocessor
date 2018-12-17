@@ -133,7 +133,7 @@ module.exports = async (blockNumber) => {
           blockNumber: rawBlock.number,
           txIndex: log.transactionIndex,
           index: log.logIndex,
-          removed: log.removed,
+          removed: _.get(log, 'removed', false),
           signature: _.get(log, 'topics.0'),
           args: log.topics,
           dataIndexStart: dataIndexStart,
