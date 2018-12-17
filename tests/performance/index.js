@@ -114,6 +114,7 @@ module.exports = (ctx) => {
   it('unconfirmed txs performance', async () => {
 
     let txCount = await models.txModel.count();
+
     const blockNumber = await ctx.web3.eth.getBlockNumber();
     const blockWatchingService = new BlockWatchingService(blockNumber);
 
@@ -127,7 +128,7 @@ module.exports = (ctx) => {
 
     await Promise.delay(5000);
     const memUsage = process.memoryUsage().heapUsed / 1024 / 1024;
-    await Promise.mapSeries(txs, async tx=> await blockWatchingService.unconfirmedTxEvent(tx));
+    await Promise.mapSeries(txs, async tx=> await blockWatchingService.unconfirmedTxEvent(tx.transactionHash));
     global.gc();
     await Promise.delay(5000);
 
