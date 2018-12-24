@@ -19,6 +19,9 @@ const Block = new mongoose.Schema({
   timestamp: {type: Number, required: true},
   uncleAmount: {type: Number, required: true},
   totalTxFee: {type: String, required: true},
+  miner: {type: String, required: true},
+  signers: {type: Array, default: [], index: true},
+  rewards: {type: Array, default: [], index: true},
   created: {type: Date, required: true, default: Date.now}
 }, {_id: false});
 

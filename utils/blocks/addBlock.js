@@ -7,12 +7,9 @@
 const bunyan = require('bunyan'),
   _ = require('lodash'),
   removeUnconfirmedTxs = require('../txs/removeUnconfirmedTxs'),
-  crypto = require('crypto'),
   sem = require('semaphore')(3),
-  Promise = require('bluebird'),
   config = require('../../config'),
   models = require('../../models'),
-  BigNumber = require('bignumber.js'),
   log = bunyan.createLogger({name: 'core.blockProcessor.services.addBlock', level: config.logs.level});
 
 /**
@@ -49,57 +46,17 @@ const addBlock = async (block, removePending = false) => {
  */
 const updateDbStateWithBlock = async (block, removePending) => {
 
-  let txs = block.transactions.map(tx => ({
-      _id: tx.hash,
-      index: tx.transactionIndex,
-      blockNumber: block.number,
-      value: tx.value,
-      to: tx.to,
-      nonce: tx.nonce,
-      gasPrice: tx.gasPrice,
-      gas: tx.gas,
-      from: tx.from
-    })
-  );
-
   const logs = _.chain(block.transactions)
-    .map(tx => tx.logs.map(origLog => {
-
-        const log = _.cloneDeep(origLog);
-        let args = log.topics;
-        let nonIndexedLogs = _.chain(log.data.replace('0x', '')).chunk(64).map(chunk => chunk.join('')).value();
-        let dataIndexStart;
-
-        if (args.length && nonIndexedLogs.length) {
-          dataIndexStart = args.length;
-          args.push(...nonIndexedLogs);
-        }
-
-
-        const txLog = new models.txLogModel({
-          blockNumber: block.number,
-          txIndex: log.transactionIndex,
-          index: log.logIndex,
-          removed: log.removed,
-          signature: _.get(log, 'topics.0'),
-          args: log.topics,
-          dataIndexStart: dataIndexStart,
-          address: log.address
-        });
-
-        txLog._id = crypto.createHash('md5').update(`${block.number}x${log.transactionIndex}x${log.logIndex}`).digest('hex');
-        return txLog;
-      })
-    )
+    .map(tx => tx.logs)
     .flattenDeep()
     .value();
 
-  log.info(`inserting ${txs.length} txs`);
-  if (txs.length) {
-    let bulkOps = txs.map(tx => ({
+  log.info(`inserting ${block.transactions.length} txs`);
+  if (block.transactions.length) {
+    let bulkOps = block.transactions.map(tx => ({
       updateOne: {
-        filter: {_id: tx._id},
-        update: tx,
+        filter: {_id: tx.hash},
+        update: new models.txModel(tx).toObject(),
         upsert: true
       }
     }));
@@ -111,8 +68,8 @@ const updateDbStateWithBlock = async (block, removePending) => {
   if (logs.length) {
     let bulkOps = logs.map(log => ({
       updateOne: {
-        filter: {_id: log._id},
-        update: {$set: log},
+        filter: {_id: log.hash},
+        update: new models.txLogModel(log).toObject(),
         upsert: true
       }
     }));
@@ -125,17 +82,8 @@ const updateDbStateWithBlock = async (block, removePending) => {
     await removeUnconfirmedTxs();
   }
 
-  let blockToSave = {
-    _id: block.hash,
-    number: block.number,
-    uncleAmount: block.uncles.length,
-    totalTxFee: _.chain(block.transactions).reduce((result, tx) =>
-        BigNumber(result).plus(BigNumber(tx.gasPrice).multipliedBy(tx.gas)).toString(),
-      '0').value().toString(),
-    timestamp: block.timestamp
-  };
 
-  await models.blockModel.update({_id: blockToSave._id}, blockToSave, {upsert: true});
+  await models.blockModel.update({_id: block.hash}, new models.blockModel(block), {upsert: true});
 };
 
 

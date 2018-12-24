@@ -24,15 +24,15 @@ module.exports = (ctx) => {
 
   it('validate block processor caching ability', async () => {
 
-    const blockNumber = await Promise.promisify(ctx.web3.eth.getBlockNumber)();
+    const blockNumber = await ctx.web3.eth.getBlockNumber();
     const addBlocksCount = 100 - blockNumber;
 
     if (addBlocksCount > 0)
       for (let i = 0; i < addBlocksCount; i++)
-        await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
+        await ctx.web3.eth.sendTransaction({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
 
 
-    const newBlockNumber = await Promise.promisify(ctx.web3.eth.getBlockNumber)();
+    const newBlockNumber = await ctx.web3.eth.getBlockNumber();
     await Promise.delay(newBlockNumber * 1000 + 10000);
 
     let blockCount = await models.blockModel.count();
@@ -43,10 +43,10 @@ module.exports = (ctx) => {
   it('kill and restart block processor', async () => {
     ctx.blockProcessorPid.kill();
     await Promise.delay(5000);
-    const blockNumber = await Promise.promisify(ctx.web3.eth.getBlockNumber)();
+    const blockNumber = await ctx.web3.eth.getBlockNumber();
 
     for (let i = 0; i < 50; i++)
-      await Promise.promisify(ctx.web3.eth.sendTransaction)({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
+      await ctx.web3.eth.sendTransaction({from: ctx.accounts[0], to: ctx.accounts[1], value: 1});
 
     ctx.blockProcessorPid = spawn('node', ['index.js'], {env: process.env, stdio: 'ignore'});
     await Promise.delay(60000);
@@ -98,8 +98,9 @@ module.exports = (ctx) => {
     state.blocks = _.chain(state.blocks).sortBy('_id').map(block => _.omit(block.toObject(), ['created', '__v'])).value();
     newBlocks = _.chain(newBlocks).sortBy('_id').map(block => _.omit(block.toObject(), ['created', '__v'])).value();
 
+
     for (let number = 0; number < state.blocks.length; number++)
-      expect(_.isEqual(state.blocks[number], newBlocks[number])).to.eq(true);
+      expect(state.blocks[number]).to.deep.equal(newBlocks[number]);
 
 
     let newTxs = await models.txModel.find({});

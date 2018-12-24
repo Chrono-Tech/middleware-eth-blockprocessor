@@ -16,7 +16,7 @@
     "require-all": "^2.2.0",
     "semaphore": "^1.1.0",
     "uniqid": "^4.1.1",
-    "web3": "^0.19.0"
+    "web3": "^1.0.0-beta.36"
   },
   "scripts": {
     "lint": "node ./node_modules/eslint/bin/eslint.js -c .eslintrc.js --ext .js --fix --ignore-path .eslintignore .",
@@ -33,7 +33,6 @@
     "eslint-plugin-chronobank": "github:chronobank/eslint-plugin-chronobank",
     "fs-extra": "^7.0.0",
     "ganache-cli": "^6.1.0",
-    "mocha": "^3.5.0",
-    "truffle-contract": "^3.0.6"
+    "mocha": "^3.5.0"
   }
 }
